@@ -240,7 +240,7 @@ class Conference(Base):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]]:
+    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
@@ -267,7 +267,7 @@ class Journal(Base):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]]:
+    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
