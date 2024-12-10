@@ -24,7 +24,7 @@ def parse_args():
                       default='./paper',
                       help='Set a directory to store these papers. (default value: "./paper")')
     args.add_argument('--sleep-time-per-paper',
-                      type=int,
+                      type=float,
                       default=0.2,
                       help='The time interval between downloads, measured in seconds. (default value: 0.2)')
 
@@ -63,14 +63,16 @@ if __name__ == '__main__':
         proxies['https'] = args.https_proxy
 
     # parse venue
-    venue_publisher = venue.parse_venue(args.venue)
+    venue_name = args.venue.lower()
+    venue_publisher = venue.parse_venue(venue_name)
+
     if not venue_publisher:
-        utils.print_and_exit(f'Unsupported venue: {args.venue}')
+        utils.print_and_exit(f'Unsupported venue: {venue_name}')
 
     # instantiate venue
     publisher = venue_publisher(save_dir=args.save_dir,
                                 sleep_time_per_paper=args.sleep_time_per_paper,
-                                venue_name=args.venue,
+                                venue_name=venue_name,
                                 year=args.year if args.year else None,
                                 volume=args.volume if args.volume else None,
                                 parallel=args.parallel,
