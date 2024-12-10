@@ -54,11 +54,14 @@ class Base(ABC):
         self.url = self._get_url()
         self.dblp_url_prefix = 'https://dblp.org/db/'
 
-    def process(self):
+    def process(self) -> None:
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
         paper_list = self._get_paper_list()
+        if not paper_list:
+            logging.error('The paper list is empty!')
+            return None
 
         if self.parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
@@ -109,7 +112,7 @@ class Base(ABC):
 
         return False
 
-    def _get_paper_list(self) -> List[Tuple[str, str]]:
+    def _get_paper_list(self) -> List[Tuple[str, str]] | None:
         if self.url.startswith(self.dblp_url_prefix):
             return self._get_paper_list_by_dblp()
 
