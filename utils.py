@@ -1,5 +1,13 @@
 import re
 
+from enum import Enum
+
+
+class _CLIColor(Enum):
+    RESET = '\033[0m'
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+
 
 def get_file_extension_name_or_default(url: str, default_value: str = None) -> str | None:
     dot_idx = url.rfind('.')
@@ -50,5 +58,15 @@ def get_absolute_url(url: str, relative_url: str) -> str:
 
 
 def print_and_exit(message: str) -> None:
-    print(message)
+    print_error(message)
     exit()
+
+
+def print_error(message: str) -> None:
+    error = _CLIColor.RED.value + message + _CLIColor.RESET.value
+    print(error)
+
+
+def print_warning(message: str) -> None:
+    warning = _CLIColor.YELLOW.value + message + _CLIColor.RESET.value
+    print(warning)
