@@ -13,7 +13,7 @@ import utils
 from tqdm import tqdm
 
 
-class VenueType(Enum):
+class DBLPVenueType(Enum):
     CONFERENCE = 'conf'
     JOURNAL = 'journals'
 
@@ -122,7 +122,7 @@ class Base(ABC):
         logging.info(f'parsing html!')
         parser = html_parser.get_parser(paper_list_html)
 
-        if self._get_dblp_venue_type() == VenueType.CONFERENCE.value:
+        if self._get_dblp_venue_type() == DBLPVenueType.CONFERENCE.value:
             paper_list_selector = '.inproceedings'
         else:
             paper_list_selector = '.article'
