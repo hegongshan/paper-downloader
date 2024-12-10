@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 from typing import Dict
 
@@ -48,3 +47,8 @@ def download_file(url: str, filename: str, proxies: Dict[str, str] = None) -> No
             file.write(r.content)
     except requests.HTTPError as e:
         logging.error(f'download file: url = {url}, filename = {filename}, error: {e}')
+
+
+def get_real_url(url: str) -> str:
+    r = requests.head(url, headers=_get_headers(), allow_redirects=True)
+    return r.url

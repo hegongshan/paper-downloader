@@ -96,7 +96,12 @@ class Base(ABC):
 
     @staticmethod
     def _paper_url_is_file_url(paper_url: str) -> bool:
-        if paper_url.lower().endswith('.pdf'):
+        file_ext_name = '.pdf'
+        if paper_url.lower().endswith(file_ext_name):
+            return True
+
+        paper_url = downloader.get_real_url(paper_url)
+        if paper_url.lower().endswith(file_ext_name):
             return True
 
         return False
@@ -266,7 +271,7 @@ class USENIX(Conference):
         if result:
             return result
 
-        return html_parser.parse_href(html, '[href*=".pdf"]')
+        return html_parser.parse_href(html, '[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         return html_parser.parse_href(html, '.usenix-schedule-slides a')
