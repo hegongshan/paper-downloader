@@ -52,6 +52,7 @@ class Base(ABC):
             self.venue_name = None
 
         self.url = self._get_url()
+        self.dblp_url_prefix = 'https://dblp.org/db/'
 
     def process(self):
         if not os.path.exists(self.save_dir):
@@ -109,11 +110,10 @@ class Base(ABC):
         return False
 
     def _get_paper_list(self) -> List[Tuple[str, str]]:
-        res = self._get_paper_list_by_diy()
-        if res is not None:
-            return res
+        if self.url.startswith(self.dblp_url_prefix):
+            return self._get_paper_list_by_dblp()
 
-        return self._get_paper_list_by_dblp()
+        return self._get_paper_list_by_diy()
 
     def _get_paper_list_by_diy(self) -> List[Tuple[str, str]] | None:
         logging.info(f'downloading {self.url}')
@@ -170,12 +170,11 @@ class Base(ABC):
         return paper_list
 
     def _get_dblp_venue_type(self) -> str | None:
-        dblp_url_prefix = 'https://dblp.org/db/'
-        start = self.url.find(dblp_url_prefix)
+        start = self.url.find(self.dblp_url_prefix)
         if start == -1:
             return None
 
-        start += len(dblp_url_prefix)
+        start += len(self.dblp_url_prefix)
         end = self.url[start:].find('/')
         if end == -1:
             return None

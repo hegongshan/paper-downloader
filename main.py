@@ -78,3 +78,4 @@ if __name__ == '__main__':
                                 parallel=args.parallel,
                                 proxies=proxies if proxies else None)
     publisher.process()
+    utils.print_success('Task Done!')

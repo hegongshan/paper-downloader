@@ -6,6 +6,7 @@ from enum import Enum
 class _CLIColor(Enum):
     RESET = '\033[0m'
     RED = '\033[91m'
+    GREEN = '\033[92m'
     YELLOW = '\033[93m'
 
 
@@ -70,3 +71,8 @@ def print_error(message: str) -> None:
 def print_warning(message: str) -> None:
     warning = _CLIColor.YELLOW.value + message + _CLIColor.RESET.value
     print(warning)
+
+
+def print_success(message: str) -> None:
+    success = _CLIColor.GREEN.value + message + _CLIColor.RESET.value
+    print(success)
