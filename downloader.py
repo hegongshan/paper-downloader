@@ -36,7 +36,7 @@ def download_html(url: str, proxies: Dict[str, str] = None) -> str | None:
         logging.error(f'download html: {url}, error: {e}')
 
 
-def download_file(url: str, filename: str, proxies: str = None) -> None:
+def download_file(url: str, filename: str, proxies: Dict[str, str] = None) -> None:
     try:
         if proxies is None:
             r = requests.get(url, headers=_get_headers())
