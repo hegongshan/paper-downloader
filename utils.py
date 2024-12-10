@@ -1,7 +1,7 @@
 import re
 
 
-def get_file_extension_name_or_default(url: str, default_value=None) -> str | None:
+def get_file_extension_name_or_default(url: str, default_value: str = None) -> str | None:
     dot_idx = url.rfind('.')
     if dot_idx == -1:
         return default_value

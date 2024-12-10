@@ -3,7 +3,7 @@ from typing import List
 from bs4 import BeautifulSoup, element
 
 
-def get_parser(html: str, parser='lxml') -> BeautifulSoup:
+def get_parser(html: str, parser: str = 'lxml') -> BeautifulSoup:
     return BeautifulSoup(html, parser)
 
 
