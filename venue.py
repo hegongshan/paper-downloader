@@ -373,7 +373,8 @@ class ECCV(Conference):
         start_year = 2018
         assert self.year is not None
         if self.year < start_year:
-            utils.print_and_exit(f'{self.__name__}: Unsupported year: {self.year}, must be [{start_year}, Now]')
+            utils.print_and_exit(
+                f'{self.__class__.__name__}: Unsupported year: {self.year}, must be [{start_year}, Now]')
 
         year_list_html = downloader.download_html(self.url, proxies=self.proxies)
         parser = html_parser.get_parser(year_list_html)
