@@ -22,7 +22,7 @@ def parse_args():
     args.add_argument('--save-dir',
                       type=str,
                       default='./paper',
-                      help='Set a directory to store these papers. (default value: ./paper)')
+                      help='Set a directory to store these papers. (default value: "./paper")')
     args.add_argument('--sleep-time-per-paper',
                       type=int,
                       default=0.2,
