@@ -20,9 +20,9 @@ options:
   -h, --help            show this help message and exit
   --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,neurips,
                         nips,acl,emnlp,naacl,rss,pvldb,vldb,jmlr.
-  --save-dir SAVE_DIR   Set a directory to store these papers.
+  --save-dir SAVE_DIR   Set a directory to store these papers. (default value: ./paper)
   --sleep-time-per-paper SLEEP_TIME_PER_PAPER
-                        The time interval between downloads, measured in seconds.
+                        The time interval between downloads, measured in seconds. (default value: 0.2)
   --year YEAR           The year of the conference.
   --volume VOLUME       The volume number of the journal.
   --http-proxy HTTP_PROXY
