@@ -8,8 +8,28 @@ $ pip3 install -r requirements.txt
 
 #### Usage
 
-```python
-$ 
+```shell
+$ python3 main.py --help
+usage: main.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--sleep-time-per-paper SLEEP_TIME_PER_PAPER]
+               [--year YEAR] [--volume VOLUME] [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY]
+               [--parallel]
+
+Run PDL.
+
+options:
+  -h, --help            show this help message and exit
+  --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,neurips,
+                        nips,acl,emnlp,naacl,rss,pvldb,vldb,jmlr.
+  --save-dir SAVE_DIR   Set a directory to store these papers.
+  --sleep-time-per-paper SLEEP_TIME_PER_PAPER
+                        The time interval between downloads, measured in seconds.
+  --year YEAR           The year of the conference.
+  --volume VOLUME       The volume number of the journal.
+  --http-proxy HTTP_PROXY
+                        HTTP Proxy server.
+  --https-proxy HTTPS_PROXY
+                        HTTPS Proxy server.
+  --parallel            Use parallel downloads.
 ```
 
 * Example
