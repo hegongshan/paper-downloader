@@ -464,7 +464,7 @@ class ACL(Conference):
     def _get_conf_url(self) -> str:
         available_confs = ['acl', 'emnlp', 'naacl']
 
-        venue_name = self.venue_name.lower()
+        venue_name = self.venue_name
         if venue_name not in available_confs:
             utils.print_and_exit(f'error: unknown conference {venue_name}')
 
