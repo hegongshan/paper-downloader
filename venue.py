@@ -234,7 +234,7 @@ class Conference(Base):
             utils.print_and_exit(f'Year is a required field, but the year value is {self.year}.')
         if self.volume:
             utils.print_warning(
-                f'The conference "{self.__class__.__name__}" does not require the volume field, but it is currently set to "{self.volume}".')
+                f'The conference "{self.venue_name}" does not require the volume field, but it is currently set to "{self.volume}".')
         return self._get_conf_url()
 
     @abstractmethod
@@ -261,7 +261,7 @@ class Journal(Base):
             utils.print_and_exit(f'Volume is a required field, but the volume number is {self.volume}.')
         if self.year:
             utils.print_warning(
-                f'The journal "{self.__class__.__name__}" does not require the year field, but it is currently set to "{self.year}".')
+                f'The journal "{self.venue_name}" does not require the year field, but it is currently set to "{self.year}".')
         return self._get_journal_url()
 
     @abstractmethod
