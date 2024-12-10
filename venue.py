@@ -349,15 +349,13 @@ class CVF(Conference):
 
         paper_list = []
         for paper_no in range(len(paper_title_list)):
-            paper_text = paper_title_list[paper_no]
+            paper_text = html_parser.get_text(paper_title_list[paper_no])
             if not paper_text:
                 continue
-            paper_text = paper_text.text.strip()
 
-            paper_url = paper_url_list[paper_no]
+            paper_url = html_parser.get_href(paper_url_list[paper_no])
             if not paper_url:
                 continue
-            paper_url = html_parser.get_href(paper_url)
 
             paper_list.append((paper_text, utils.get_absolute_url(self.url, paper_url)))
         return paper_list
@@ -406,15 +404,13 @@ class ECCV(Conference):
 
         paper_list = []
         for paper_no in range(len(paper_title_list)):
-            paper_title = paper_title_list[paper_no]
+            paper_title = html_parser.get_text(paper_title_list[paper_no])
             if not paper_title:
                 continue
-            paper_title = html_parser.get_text(paper_title)
 
-            paper_url = paper_url_list[paper_no]
+            paper_url = html_parser.get_href(paper_url_list[paper_no])
             if not paper_url:
                 continue
-            paper_url = html_parser.get_href(paper_url)
 
             paper_list.append((paper_title, utils.get_absolute_url(self.url, paper_url)))
         return paper_list
@@ -531,13 +527,37 @@ class PVLDB(Journal):
 class JMLR(Journal):
 
     def _get_journal_url(self) -> str:
-        return f'https://dblp.org/db/journals/jmlr/jmlr{self.volume}.html'
+        return f'https://jmlr.org/papers/v{self.volume}/'
 
     def _get_paper_list_by_diy(self) -> List[Tuple[str, str]]:
-        pass
+        self.url = self._get_url()
+        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
+
+        parser = html_parser.get_parser(paper_list_html)
+        paper_title_list = parser.select('dt')
+        paper_url_list = parser.select('a[href$=".pdf"]')
+
+        num_titles = len(paper_title_list)
+        num_urls = len(paper_url_list)
+        if num_titles != num_urls:
+            utils.print_and_exit(f'Number of titles ({num_titles}) is not equal to number of urls ({num_urls}).')
+
+        paper_list = []
+        for paper_no in range(num_titles):
+            paper_title = html_parser.get_text(paper_title_list[paper_no])
+            if not paper_title:
+                continue
+
+            paper_url = html_parser.get_href(paper_url_list[paper_no])
+            if not paper_url:
+                continue
+
+            paper_list.append((paper_title, utils.get_absolute_url(self.url, paper_url)))
+
+        return paper_list
 
     def _get_paper_file_url(self, html: str) -> str:
-        return html_parser.parse_href(html, 'a[href$=".pdf"]')
+        pass
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
