@@ -254,12 +254,12 @@ class Journal(Base):
 class USENIX(Conference):
 
     def _get_conf_url(self) -> str:
-        if self.venue_name.lower() == 'atc':
+        if self.venue_name == 'atc':
             self.venue_name = 'usenix'
 
         available_confs = ['fast', 'osdi', 'usenix', 'nsdi', 'uss']
-        if self.venue_name.lower() not in available_confs:
-            utils.print_and_exit(f'error: unknown confernce {venue_name}')
+        if self.venue_name not in available_confs:
+            utils.print_and_exit(f'error: unknown confernce {self.venue_name}')
 
         return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}.html'
 
@@ -469,7 +469,7 @@ class ACL(Conference):
             utils.print_and_exit(f'error: unknown conference {venue_name}')
 
         if ((venue_name == 'acl' and self.year >= 2012)
-                or (venue == 'emnlp' and 2019 <= self.year <= 2021)
+                or (venue_name == 'emnlp' and 2019 <= self.year <= 2021)
                 or (venue_name == 'naacl' and 2018 <= self.year <= 2019)):
             suffix = '-1'
         else:
@@ -530,7 +530,7 @@ class JMLR(Journal):
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
-        return html_parser.parse_href(html, '#pdf')
+        return html_parser.parse_href(html, 'a[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
