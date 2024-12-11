@@ -90,7 +90,9 @@ class DownloaderThread(QThread):
             venue_name_lower = self.venue_name.lower()
             venue_publisher = venue.parse_venue(venue_name_lower)
             if not venue_publisher:
-                utils.print_and_exit(f'Unsupported venue: {venue_name_lower}')
+                logging.error(f'Unsupported venue: {venue_name_lower}')
+                return None
+
 
             # 实例化publisher
             publisher = venue_publisher(
