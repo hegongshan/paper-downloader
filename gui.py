@@ -1,6 +1,5 @@
 import sys
 import os
-import argparse
 import logging
 import threading
 
@@ -110,7 +109,6 @@ class DownloaderThread(QThread):
 
             publisher.process()
 
-            utils.print_success('Task Done!')
             self.finished_signal.emit("Download Finished.")
 
         except Exception as e:
