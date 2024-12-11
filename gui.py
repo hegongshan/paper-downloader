@@ -2,14 +2,14 @@ import logging
 import os
 import sys
 import threading
-
+from bs4 import BeautifulSoup
 import utils
 import venue
 
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox,QGridLayout,QGroupBox
+    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox
 )
 
 
@@ -91,59 +91,10 @@ class PaperDownloaderGUI(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Paper Bulk Downloader')
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #f9f9f9;
-                font-family: Arial, sans-serif;
-                font-size: 14px;
-            }
-            QLineEdit, QPushButton, QTextEdit {
-                border: 1px solid #cccccc;
-                border-radius: 5px;
-                padding: 6px;
-                background-color: #ffffff;
-            }
-            QPushButton {
-                background-color: #007BFF;
-                color: white;
-                border: 1px solid #0056b3;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0056b3;
-            }
-            QPushButton:pressed {
-                background-color: #003f7f;
-                border: 1px solid #002a5b;
-            }
-            QPushButton:disabled {
-                background-color: #d6d6d6;
-                color: #a9a9a9;
-            }
-            QLabel {
-                font-weight: bold;
-                color: #333333;
-            }
-            QGroupBox {
-                border: 1px solid #cccccc;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                color: #333333;
-                font-weight: bold;
-                padding: 0 5px;
-            }
-            QTextEdit {
-                border: 1px solid #cccccc;
-                border-radius: 5px;
-                background-color: #ffffff;
-            }
-        """)
+        self.setWindowTitle('Paper Bulk Downloader for Open Access Venues')
+        with open("gui.qss", "r", encoding="utf-8") as f:
+            qss = f.read()
+        self.setStyleSheet(qss)
 
         main_layout = QVBoxLayout()
         lang_help_layout = QHBoxLayout()
@@ -284,8 +235,6 @@ class PaperDownloaderGUI(QWidget):
             self.https_proxy_label.setText('HTTPS Proxy:')
             self.parallel_button.setText('Parallel: Disabled')
 
-
-
     def select_save_dir(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Save Directory')
         if directory:
@@ -412,9 +361,68 @@ class PaperDownloaderGUI(QWidget):
         self.run_button.setEnabled(True)
         self.pause_button.setEnabled(False)
 
+    def get_conf_jounal(self):
+
+        with open("README.md", "r", encoding="utf-8") as f:
+            content = f.read()
+
+        soup = BeautifulSoup(content, "html.parser")
+        table = soup.find("table")
+        if not table:
+            return ""
+
+        headers = [th.get_text(strip=True) for th in table.find("tr").find_all("th")]
+        if "Conf/Journal" not in headers:
+            return ""
+
+        conf_col_index = headers.index("Conf/Journal")
+        rows = table.find_all("tr")[1:]
+        result = []
+        rowspan_map = {}
+
+        for row in rows:
+            cells = row.find_all(["td", "th"])
+            current_row = []
+            col_index = 0
+
+            for cell in cells:
+                while col_index in rowspan_map and rowspan_map[col_index][0] > 0:
+                    current_row.append(rowspan_map[col_index][1])
+                    rowspan_map[col_index][0] -= 1
+                    if rowspan_map[col_index][0] == 0:
+                        del rowspan_map[col_index]
+                    col_index += 1
+
+                text = cell.get_text(strip=True)
+                rowspan = int(cell.get("rowspan", 1))
+                colspan = int(cell.get("colspan", 1))
+
+                for _ in range(colspan):
+                    current_row.append(text)
+                    if rowspan > 1:
+                        rowspan_map[col_index] = [rowspan - 1, text]
+                    col_index += 1
+
+            while col_index in rowspan_map and rowspan_map[col_index][0] > 0:
+                current_row.append(rowspan_map[col_index][1])
+                rowspan_map[col_index][0] -= 1
+                if rowspan_map[col_index][0] == 0:
+                    del rowspan_map[col_index]
+                col_index += 1
+
+            result.append(current_row)
+
+        conf_journal_data = [row[conf_col_index] for row in result if len(row) > conf_col_index]
+        conf_journal_string = ", ".join(conf_journal_data)
+        print("Conf/Journal 列的字符串数据：", conf_journal_string)
+        return conf_journal_string
+
     def show_help_dialog(self):
+        publications = self.get_conf_jounal()
+        if not publications:
+            publications = "None"
         if self.current_language == 'Chinese':
-            help_text = """
+            help_text = f"""
             <b>开源论文批量下载器帮助:</b><br>
             <ul>
                 <li>在“基本设置”中填写必填字段。</li>
@@ -422,12 +430,12 @@ class PaperDownloaderGUI(QWidget):
                 <li>点击“运行”按钮开始下载，或点击“暂停”按钮暂停。</li>
                 <li>使用“切换到英文”按钮切换语言。</li>
             </ul>
-            <p>目前可直接下载的论文：<b>AAAI, IJCAI, CVPR, ICCV, ECCV, ICLR, ICML, NeurIPS, JMLR, ACL, EMNLP, NAACL, 
-            NSDI, VLDB, USENIX Security, NDSS, OSDI, FAST, USENIX ATC, RSS</b></p>
+            <p>目前可直接下载的论文:<b>{publications}</b><p>
+            
             """
             title = '帮助'
         else:
-            help_text = """
+            help_text = f"""
             <b>Paper Bulk Downloader for OPen Access Venues Help:</b><br>
             <ul>
                 <li>Fill in the required fields under Basic Settings.</li>
@@ -435,8 +443,7 @@ class PaperDownloaderGUI(QWidget):
                 <li>Click "Run" to start downloading, or "Pause" to pause.</li>
                 <li>Use the "Switch to Chinese" button to toggle languages.</li>
             </ul>
-            <p>Currently supported publications:<b>AAAI, IJCAI, CVPR, ICCV, ECCV, ICLR, ICML, NeurIPS, JMLR, ACL, EMNLP, NAACL, 
-            NSDI, VLDB, USENIX Security, NDSS, OSDI, FAST, USENIX ATC, RSS</b></p>
+            <p>Currently supported publications:<b>{publications}</b></p>
             """
             title = 'Help'
 

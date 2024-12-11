@@ -1,0 +1,73 @@
+QWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #eeeeee);
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+    color: #333333;
+}
+
+QLineEdit, QPushButton, QTextEdit {
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 6px;
+    background-color: #ffffff;
+}
+
+QPushButton {
+    background-color: #5C9BD5;
+    color: white;
+    font-weight: bold;
+    border: none;
+}
+
+QPushButton:hover {
+    background-color: #4a89c4;
+}
+
+QPushButton:pressed {
+    background-color: #3b79b0;
+}
+
+QPushButton:disabled {
+    background-color: #d6d6d6;
+    color: #a9a9a9;
+}
+
+QLabel {
+    font-weight: bold;
+    color: #333333;
+    margin-right: 5px;
+}
+
+QGroupBox {
+    border: 1px solid #cccccc;
+    border-radius: 10px;
+    margin-top: 20px;
+    background-color: #ffffff;
+    padding: 15px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    color: #333333;
+    font-weight: bold;
+    background: transparent;
+    padding: 0 10px;
+}
+
+QTextEdit {
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    background-color: #ffffff;
+}
+
+QPushButton#helpButton {
+    background-color: #28a745;
+    color: #ffffff;
+}
+QPushButton#helpButton:hover {
+    background-color: #218838;
+}
+QPushButton#helpButton:pressed {
+    background-color: #1e7e34;
+}
