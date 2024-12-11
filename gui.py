@@ -1,16 +1,15 @@
-import sys
-import os
 import logging
+import os
+import sys
 import threading
 
+import utils
+import venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox
 )
-
-import utils
-import venue
 
 
 # -------------------------------------------
@@ -32,17 +31,10 @@ class DownloaderThread(QThread):
     error_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, venue_name, save_dir, year, sleep_time_per_paper=0.2, volume=None,
-                 http_proxy=None, https_proxy=None, parallel=False):
+    def __init__(self, publisher: venue.Base):
         super().__init__()
-        self.venue_name = venue_name
-        self.save_dir = save_dir
-        self.year = year
-        self.sleep_time_per_paper = sleep_time_per_paper
-        self.volume = volume
-        self.http_proxy = http_proxy
-        self.https_proxy = https_proxy
-        self.parallel = parallel
+
+        self.publisher = publisher
 
         self.paused = False
         self.stop_flag = False
@@ -78,36 +70,10 @@ class DownloaderThread(QThread):
             stream_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
             logger.addHandler(stream_handler)
 
-            # 设置代理
-            proxies = {}
-            if self.http_proxy:
-                proxies['http'] = self.http_proxy
-            if self.https_proxy:
-                proxies['https'] = self.https_proxy
-
-            # 解析venue
-            venue_name_lower = self.venue_name.lower()
-            venue_publisher = venue.parse_venue(venue_name_lower)
-            if not venue_publisher:
-                logging.error(f'Unsupported venue: {venue_name_lower}')
-                return None
-
-
-            # 实例化publisher
-            publisher = venue_publisher(
-                save_dir=self.save_dir,
-                sleep_time_per_paper=self.sleep_time_per_paper,
-                venue_name=venue_name_lower,
-                year=self.year if self.year else None,
-                volume=self.volume if self.volume else None,
-                parallel=self.parallel,
-                proxies=proxies if proxies else None
-            )
-
             # 注意：目前没有对publisher内部流程进行暂停逻辑的插入
             # 如需暂停，需要在publisher.process()内部适当位置调用self.check_paused()
 
-            publisher.process()
+            self.publisher.process()
 
             self.finished_signal.emit("Download Finished.")
 
@@ -221,44 +187,78 @@ class PaperDownloaderGUI(QWidget):
         venue_name = self.venue_input.text().strip()
         save_dir = self.save_dir_input.text().strip()
         year = self.year_input.text().strip()
-        sleep_time = self.sleep_time_input.text().strip()
+        sleep_time_per_paper = self.sleep_time_input.text().strip()
         volume = self.volume_input.text().strip()
         http_proxy = self.http_proxy_input.text().strip()
         https_proxy = self.https_proxy_input.text().strip()
         parallel = self.parallel_button.isChecked()
 
-        if not venue_name or not save_dir:
-            QMessageBox.warning(self, 'Input Error', 'Please fill in required fields (venue, save-dir).')
+        if not venue_name:
+            QMessageBox.warning(self, 'Input Error', '"Venue" is a required field.')
             return
 
-        try:
-            year = int(year) if year else None
-        except ValueError:
-            QMessageBox.warning(self, 'Input Error', 'Year must be an integer.')
+        if not save_dir:
+            QMessageBox.warning(self, 'Input Error', '"Save directory" is a required field..')
             return
 
-        try:
-            sleep_time = float(sleep_time) if sleep_time else 0.2
-        except ValueError:
-            QMessageBox.warning(self, 'Input Error', 'Sleep time must be a number.')
-            return
+        # 解析venue
+        venue_name_lower = venue_name.lower()
+        venue_publisher = venue.parse_venue(venue_name_lower)
+        if not venue_publisher:
+            QMessageBox.warning(self, 'Input Error', f'Unsupported venue: {venue_name_lower}')
+            return None
+
+        if venue.is_conference(venue_publisher):
+            if not year:
+                QMessageBox.warning(self, 'Input Error', '"Year" is a required field.')
+                return
+
+            try:
+                year = int(year)
+            except ValueError:
+                QMessageBox.warning(self, 'Input Error', '"Year" must be an integer.')
+                return
+
+        if venue.is_journal(venue_publisher):
+            if not volume:
+                QMessageBox.warning(self, 'Input Error', '"Volume" is a required field.')
+                return
+
+            try:
+                volume = int(volume)
+            except ValueError:
+                QMessageBox.warning(self, 'Input Error', '"Volume" must be an integer.')
+                return
 
         try:
-            volume = int(volume) if volume else None
+            sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else 0.2
         except ValueError:
-            QMessageBox.warning(self, 'Input Error', 'Volume must be an integer.')
+            QMessageBox.warning(self, 'Input Error', '"Sleep time" must be a number.')
             return
 
         self.log_output.clear()
         self.log_output.append("Starting download...")
 
+        # 设置代理
+        proxies = {}
+        if http_proxy:
+            proxies['http'] = http_proxy
+        if https_proxy:
+            proxies['https'] = https_proxy
+
+        # 实例化publisher
+        publisher = venue_publisher(
+            save_dir=save_dir,
+            sleep_time_per_paper=sleep_time_per_paper,
+            venue_name=venue_name_lower,
+            year=year if year else None,
+            volume=volume if volume else None,
+            parallel=parallel,
+            proxies=proxies if proxies else None
+        )
+
         # 创建线程
-        self.thread = DownloaderThread(venue_name, save_dir, year,
-                                       sleep_time_per_paper=sleep_time,
-                                       volume=volume,
-                                       http_proxy=http_proxy,
-                                       https_proxy=https_proxy,
-                                       parallel=parallel)
+        self.thread = DownloaderThread(publisher=publisher)
         self.thread.log_signal.connect(self.append_log)
         self.thread.error_signal.connect(self.show_error)
         self.thread.finished_signal.connect(self.task_finished)

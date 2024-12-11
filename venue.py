@@ -631,3 +631,11 @@ def parse_venue(venue: str) -> Base | None:
     if venue not in __venue_dict.keys():
         return None
     return __venue_dict[venue]
+
+
+def is_conference(venue_publisher: type):
+    return issubclass(venue_publisher, Conference)
+
+
+def is_journal(venue_publisher: type):
+    return issubclass(venue_publisher, Journal)
