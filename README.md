@@ -18,8 +18,8 @@ Run PDL.
 
 options:
   -h, --help            show this help message and exit
-  --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,neurips,
-                        nips,acl,emnlp,naacl,rss,pvldb,vldb,jmlr.
+  --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,icml,neu
+                        rips,nips,acl,emnlp,naacl,rss,pvldb,vldb,jmlr.
   --save-dir SAVE_DIR   Set a directory to store these papers. (default value: "./paper")
   --sleep-time-per-paper SLEEP_TIME_PER_PAPER
                         The time interval between downloads, measured in seconds. (default value: 0.2)
@@ -48,7 +48,7 @@ $ python3 main.py --venue fast --year 2023
         <th>URL</th>
     </tr>
 	<tr>
-        <td rowspan="11">AI</td>
+        <td rowspan="12">AI</td>
         <td rowspan="2">Artificial intelligents</td>
         <td>AAAI</td>
         <td>
@@ -83,9 +83,15 @@ $ python3 main.py --venue fast --year 2023
         </td>
     </tr>
     <tr>
-        <td rowspan="3">Machine Learning</td>
+        <td rowspan="4">Machine Learning</td>
         <td>ICLR</td>
         <td><a href="https://dblp.uni-trier.de/db/conf/iclr/index.html">https://dblp.uni-trier.de/db/conf/iclr/index.html</a></td>
+    </tr>
+    <tr>
+        <td>ICML</td>
+        <td>
+            <a href="https://dblp.uni-trier.de/db/conf/icml/index.html">https://dblp.uni-trier.de/db/conf/icml/index.html</a>
+        </td>
     </tr>
     <tr>
         <td>NeurIPS</td>

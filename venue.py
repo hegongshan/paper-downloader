@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 import os
+import random
 import re
 import time
 from abc import ABC, abstractmethod
@@ -51,6 +52,11 @@ class Base(ABC):
         else:
             self.venue_name = None
 
+        if 'test_mode' in kwargs:
+            self.test_mode = kwargs['test_mode']
+        else:
+            self.test_mode = False
+
         self.url = self._get_url()
         self.dblp_url_prefix = 'https://dblp.org/db/'
 
@@ -63,14 +69,18 @@ class Base(ABC):
             logging.error('The paper list is empty!')
             return None
 
-        if self.parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                with tqdm(total=len(paper_list)) as progress_bar:
-                    for _ in pool.imap_unordered(self._process_one, paper_list):
-                        progress_bar.update(1)
+        if self.test_mode:
+            test_paper = random.sample(paper_list, 1)[0]
+            self._process_one(test_paper)
         else:
-            for paper_entry in tqdm(paper_list):
-                self._process_one(paper_entry)
+            if self.parallel:
+                with mp.Pool(processes=mp.cpu_count()) as pool:
+                    with tqdm(total=len(paper_list)) as progress_bar:
+                        for _ in pool.imap_unordered(self._process_one, paper_list):
+                            progress_bar.update(1)
+            else:
+                for paper_entry in tqdm(paper_list):
+                    self._process_one(paper_entry)
 
     def _process_one(self, paper_info: Tuple[str, str]):
         paper_title, paper_url = paper_info
@@ -113,14 +123,18 @@ class Base(ABC):
         return False
 
     def _get_paper_list(self) -> List[Tuple[str, str]] | None:
-        if self.url.startswith(self.dblp_url_prefix):
-            return self._get_paper_list_by_dblp()
-
-        return self._get_paper_list_by_diy()
-
-    def _get_paper_list_by_diy(self) -> List[Tuple[str, str]] | None:
         logging.info(f'downloading {self.url}')
-        result_tuple = self._get_paper_title_and_url_list_by_diy()
+        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
+        if not paper_list_html or not paper_list_html.strip():
+            return None
+
+        if self.url.startswith(self.dblp_url_prefix):
+            return self._get_paper_list_by_dblp(paper_list_html)
+
+        return self._get_paper_list_by_diy(paper_list_html)
+
+    def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]] | None:
+        result_tuple = self._get_paper_title_and_url_list_by_diy(html)
         if not result_tuple:
             utils.print_and_exit(f'Unable to extract title and URL from the given URL ({self.url}).')
 
@@ -143,13 +157,11 @@ class Base(ABC):
             paper_list.append((paper_title, utils.get_absolute_url(self.url, paper_url)))
         return paper_list
 
-    def _get_paper_list_by_dblp(self) -> List[Tuple[str, str]] | None:
-        logging.info(f'downloading {self.url}')
-        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
-
+    def _get_paper_list_by_dblp(self, html) -> List[Tuple[str, str]] | None:
         paper_list = []
+
         logging.info(f'parsing html!')
-        parser = html_parser.get_parser(paper_list_html)
+        parser = html_parser.get_parser(html)
 
         if self._get_dblp_venue_type() == DBLPVenueType.CONFERENCE.value:
             paper_list_selector = '.inproceedings'
@@ -215,7 +227,7 @@ class Base(ABC):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
@@ -242,7 +254,7 @@ class Conference(Base):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
@@ -269,7 +281,7 @@ class Journal(Base):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
@@ -297,7 +309,7 @@ class USENIX(Conference):
 
         return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -316,7 +328,7 @@ class NDSS(Conference):
     def _get_conf_url(self) -> str:
         return f'https://dblp.org/db/conf/ndss/ndss{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -330,7 +342,7 @@ class AAAI(Conference):
     def _get_conf_url(self) -> str:
         return f'https://dblp.org/db/conf/aaai/aaai{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -344,7 +356,7 @@ class IJCAI(Conference):
     def _get_conf_url(self) -> str:
         return f'https://dblp.org/db/conf/ijcai/ijcai{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -363,10 +375,8 @@ class CVF(Conference):
 
         return f'https://openaccess.thecvf.com/{venue_name}{self.year}?day=all'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
-        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
-
-        parser = html_parser.get_parser(paper_list_html)
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
+        parser = html_parser.get_parser(html)
 
         paper_title_list = parser.select('.ptitle a')
         paper_url_list = parser.select('.ptitle + dd + dd > a:first-child')
@@ -384,14 +394,13 @@ class ECCV(Conference):
     def _get_conf_url(self) -> str:
         return 'https://www.ecva.net/papers.php'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         start_year = 2018
         if self.year < start_year:
             utils.print_and_exit(
                 f'{self.__class__.__name__}: Unsupported year: {self.year}, must be [{start_year}, Now]')
 
-        year_list_html = downloader.download_html(self.url, proxies=self.proxies)
-        parser = html_parser.get_parser(year_list_html)
+        parser = html_parser.get_parser(html)
 
         year_idx = -1
         year_tag_list = parser.select('button.accordion')
@@ -425,7 +434,7 @@ class ICLR(Conference):
     def _get_conf_url(self) -> str:
         return f'https://dblp.org/db/conf/iclr/iclr{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -434,7 +443,31 @@ class ICLR(Conference):
             return html_parser.parse_href(html, '.download-pdf')
 
         # openreview.net
-        return html_parser.parse_href(html, '.title_pdf_row .note_content_pdf')
+        return html_parser.parse_href(html, 'a[href^="/pdf"]')
+
+    def _get_slides_file_url(self, html: str) -> str:
+        pass
+
+
+class ICML(Conference):
+
+    def _get_conf_url(self) -> str:
+        return f'https://dblp.org/db/conf/icml/icml{self.year}.html'
+
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
+        pass
+
+    def _get_paper_file_url(self, html: str) -> str:
+        # ACM
+        if self.year < 2010:
+            return ""
+
+        # mlr.press
+        if 2010 <= self.year <= 2023:
+            return html_parser.parse_href(html, 'a[href$=".pdf"]')
+
+        # openreview.net
+        return html_parser.parse_href(html, 'a[href^="/pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
@@ -450,7 +483,7 @@ class NeurIPS(Conference):
 
         return f'https://dblp.org/db/conf/nips/{venue_name}{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -478,7 +511,7 @@ class ACL(Conference):
 
         return f'https://dblp.org/db/conf/{venue_name}/{venue_name}{self.year}{suffix}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -493,7 +526,7 @@ class RSS(Conference):
     def _get_conf_url(self) -> str:
         return f'https://dblp.org/db/conf/rss/rss{self.year}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -512,7 +545,7 @@ class PVLDB(Journal):
     def _get_journal_url(self) -> str:
         return f'https://dblp.org/db/journals/pvldb/pvldb{self.volume}.html'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
@@ -527,10 +560,8 @@ class JMLR(Journal):
     def _get_journal_url(self) -> str:
         return f'https://jmlr.org/papers/v{self.volume}/'
 
-    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
-        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
-
-        parser = html_parser.get_parser(paper_list_html)
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
+        parser = html_parser.get_parser(html)
         paper_title_list = parser.select('dt')
         paper_url_list = parser.select('a[href$=".pdf"]')
 
@@ -568,6 +599,7 @@ __venue_dict = {
 
     # Machine Learning
     'iclr': ICLR,
+    'icml': ICML,
     'neurips': NeurIPS,
     # alias for 'neurips'
     'nips': NeurIPS,
@@ -599,3 +631,11 @@ def parse_venue(venue: str) -> Base | None:
     if venue not in __venue_dict.keys():
         return None
     return __venue_dict[venue]
+
+
+def is_conference(venue_publisher: type):
+    return issubclass(venue_publisher, Conference)
+
+
+def is_journal(venue_publisher: type):
+    return issubclass(venue_publisher, Journal)
