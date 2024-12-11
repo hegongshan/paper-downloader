@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 import os
+import random
 import re
 import time
 from abc import ABC, abstractmethod
@@ -51,6 +52,11 @@ class Base(ABC):
         else:
             self.venue_name = None
 
+        if 'test_mode' in kwargs:
+            self.test_mode = kwargs['test_mode']
+        else:
+            self.test_mode = False
+
         self.url = self._get_url()
         self.dblp_url_prefix = 'https://dblp.org/db/'
 
@@ -63,14 +69,18 @@ class Base(ABC):
             logging.error('The paper list is empty!')
             return None
 
-        if self.parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                with tqdm(total=len(paper_list)) as progress_bar:
-                    for _ in pool.imap_unordered(self._process_one, paper_list):
-                        progress_bar.update(1)
+        if self.test_mode:
+            test_paper = random.sample(paper_list, 1)[0]
+            self._process_one(test_paper)
         else:
-            for paper_entry in tqdm(paper_list):
-                self._process_one(paper_entry)
+            if self.parallel:
+                with mp.Pool(processes=mp.cpu_count()) as pool:
+                    with tqdm(total=len(paper_list)) as progress_bar:
+                        for _ in pool.imap_unordered(self._process_one, paper_list):
+                            progress_bar.update(1)
+            else:
+                for paper_entry in tqdm(paper_list):
+                    self._process_one(paper_entry)
 
     def _process_one(self, paper_info: Tuple[str, str]):
         paper_title, paper_url = paper_info
