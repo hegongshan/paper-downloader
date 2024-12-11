@@ -9,8 +9,8 @@ $ pip3 install -r requirements.txt
 #### Usage
 
 ```shell
-$ python3 main.py --help
-usage: main.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--sleep-time-per-paper SLEEP_TIME_PER_PAPER]
+$ python3 cli.py --help
+usage: cli.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--sleep-time-per-paper SLEEP_TIME_PER_PAPER]
                [--year YEAR] [--volume VOLUME] [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY]
                [--parallel]
 
@@ -35,7 +35,7 @@ options:
 * Example
 
 ```shell
-$ python3 main.py --venue fast --year 2023
+$ python3 cli.py --venue fast --year 2023
 ```
 
 * Supported Venue

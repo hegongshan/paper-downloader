@@ -69,6 +69,19 @@ if __name__ == '__main__':
     if not venue_publisher:
         utils.print_and_exit(f'Unsupported venue: {venue_name}')
 
+    if venue.is_conference(venue_publisher):
+        if not args.year:
+            utils.print_and_exit(f'Year is a required field.')
+        if args.volume:
+            utils.print_warning(
+                f'The conference "{venue_name}" does not require the volume field, but it is currently set to "{args.volume}".')
+    elif venue.is_journal(venue_publisher):
+        if not args.volume:
+            utils.print_and_exit(f'Volume is a required field.')
+        if args.year:
+            utils.print_warning(
+                f'The journal "{venue_name}" does not require the year field, but it is currently set to "{args.year}".')
+
     # instantiate venue
     publisher = venue_publisher(save_dir=args.save_dir,
                                 sleep_time_per_paper=args.sleep_time_per_paper,

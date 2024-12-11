@@ -193,6 +193,8 @@ class PaperDownloaderGUI(QWidget):
         https_proxy = self.https_proxy_input.text().strip()
         parallel = self.parallel_button.isChecked()
 
+        self.log_output.clear()
+
         if not venue_name:
             QMessageBox.warning(self, 'Input Error', '"Venue" is a required field.')
             return
@@ -219,7 +221,10 @@ class PaperDownloaderGUI(QWidget):
                 QMessageBox.warning(self, 'Input Error', '"Year" must be an integer.')
                 return
 
-        if venue.is_journal(venue_publisher):
+            if volume:
+                self.log_output.append(
+                    f'Warning: The conference "{venue_name}" does not require the volume field, but it is currently set to "{volume}".')
+        elif venue.is_journal(venue_publisher):
             if not volume:
                 QMessageBox.warning(self, 'Input Error', '"Volume" is a required field.')
                 return
@@ -230,13 +235,16 @@ class PaperDownloaderGUI(QWidget):
                 QMessageBox.warning(self, 'Input Error', '"Volume" must be an integer.')
                 return
 
+            if year:
+                self.log_output.append(
+                    f'Warning: The journal "{venue_name}" does not require the year field, but it is currently set to "{year}".')
+
         try:
             sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else 0.2
         except ValueError:
             QMessageBox.warning(self, 'Input Error', '"Sleep time" must be a number.')
             return
 
-        self.log_output.clear()
         self.log_output.append("Starting download...")
 
         # 设置代理

@@ -37,16 +37,6 @@ class Base(ABC):
         self.parallel = parallel
         self.proxies = proxies
 
-        if 'year' in kwargs:
-            self.year = kwargs['year']
-        else:
-            self.year = None
-
-        if 'volume' in kwargs:
-            self.volume = kwargs['volume']
-        else:
-            self.volume = None
-
         if 'venue_name' in kwargs:
             self.venue_name = kwargs['venue_name']
         else:
@@ -58,6 +48,9 @@ class Base(ABC):
             self.test_mode = False
 
         self.url = self._get_url()
+        if not self.url:
+            return
+
         self.dblp_url_prefix = 'https://dblp.org/db/'
 
     def process(self) -> None:
@@ -93,17 +86,17 @@ class Base(ABC):
             logging.info(f'(pid {pid}) downloading html: {paper_url}')
             paper_html = downloader.download_html(paper_url, proxies=self.proxies)
             if paper_html is None:
-                return
+                return None
 
             paper_file_url = self._get_paper_file_url(paper_html)
             if paper_file_url is None:
-                return
+                return None
             logging.info(f'(pid {pid}) downloading paper: {paper_file_url}')
             self._download_paper(utils.get_absolute_url(paper_url, paper_file_url), paper_title)
 
             paper_slides_url = self._get_slides_file_url(paper_html)
             if paper_slides_url is None:
-                return
+                return None
             logging.info(f'(pid {pid}) downloading slides: {paper_slides_url}')
             self._download_slides(utils.get_absolute_url(paper_url, paper_slides_url), paper_title)
 
@@ -136,13 +129,15 @@ class Base(ABC):
     def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]] | None:
         result_tuple = self._get_paper_title_and_url_list_by_diy(html)
         if not result_tuple:
-            utils.print_and_exit(f'Unable to extract title and URL from the given URL ({self.url}).')
+            logging.error(f'Unable to extract title and URL from the given URL ({self.url}).')
+            return None
 
         paper_title_list, paper_url_list = result_tuple
         num_titles = len(paper_title_list)
         num_urls = len(paper_url_list)
         if num_titles != num_urls:
-            utils.print_and_exit(f'Number of titles ({num_titles}) is not equal to number of urls ({num_urls}).')
+            logging.error(f'Number of titles ({num_titles}) is not equal to number of urls ({num_urls}).')
+            return None
 
         paper_list = []
         for paper_no in range(num_titles):
@@ -208,7 +203,7 @@ class Base(ABC):
 
     def _download_paper(self, paper_file_url: str, paper_title: str) -> None:
         if not paper_file_url:
-            return
+            return None
 
         paper_filename = self._get_filename(paper_title, paper_file_url, name_suffix='Paper')
         if not os.path.exists(paper_filename):
@@ -216,14 +211,14 @@ class Base(ABC):
 
     def _download_slides(self, paper_slides_url: str, paper_title: str) -> None:
         if not paper_slides_url:
-            return
+            return None
 
         slides_filename = self._get_filename(paper_title, paper_slides_url, name_suffix='Slides')
         if not os.path.exists(slides_filename):
             downloader.download_file(paper_slides_url, slides_filename, proxies=self.proxies)
 
     @abstractmethod
-    def _get_url(self) -> str:
+    def _get_url(self) -> str | None:
         pass
 
     @abstractmethod
@@ -241,16 +236,16 @@ class Base(ABC):
 
 class Conference(Base):
 
-    def _get_url(self) -> str:
-        if self.year is None:
-            utils.print_and_exit(f'Year is a required field, but the year value is {self.year}.')
-        if self.volume:
-            utils.print_warning(
-                f'The conference "{self.venue_name}" does not require the volume field, but it is currently set to "{self.volume}".')
-        return self._get_conf_url()
+    def __init__(self, save_dir: str, sleep_time_per_paper: float, **kwargs):
+        if 'year' in kwargs:
+            self.year = kwargs['year']
+        else:
+            self.year = None
+
+        super().__init__(save_dir, sleep_time_per_paper, **kwargs)
 
     @abstractmethod
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         pass
 
     @abstractmethod
@@ -268,16 +263,16 @@ class Conference(Base):
 
 class Journal(Base):
 
-    def _get_url(self) -> str:
-        if self.volume is None:
-            utils.print_and_exit(f'Volume is a required field, but the volume number is {self.volume}.')
-        if self.year:
-            utils.print_warning(
-                f'The journal "{self.venue_name}" does not require the year field, but it is currently set to "{self.year}".')
-        return self._get_journal_url()
+    def __init__(self, save_dir: str, sleep_time_per_paper: float, **kwargs):
+        if 'volume' in kwargs:
+            self.volume = kwargs['volume']
+        else:
+            self.volume = None
+
+        super().__init__(save_dir, sleep_time_per_paper, **kwargs)
 
     @abstractmethod
-    def _get_journal_url(self) -> str:
+    def _get_url(self) -> str | None:
         pass
 
     @abstractmethod
@@ -299,13 +294,14 @@ class Journal(Base):
 
 class USENIX(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         if self.venue_name == 'atc':
             self.venue_name = 'usenix'
 
         available_confs = ['fast', 'osdi', 'usenix', 'nsdi', 'uss']
         if self.venue_name not in available_confs:
-            utils.print_and_exit(f'error: unknown confernce {self.venue_name}')
+            logging.error(f'error: unknown confernce {self.venue_name}')
+            return None
 
         return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}.html'
 
@@ -325,7 +321,7 @@ class USENIX(Conference):
 
 class NDSS(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/ndss/ndss{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -339,7 +335,7 @@ class NDSS(Conference):
 
 
 class AAAI(Conference):
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/aaai/aaai{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -353,7 +349,7 @@ class AAAI(Conference):
 
 
 class IJCAI(Conference):
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/ijcai/ijcai{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -367,11 +363,12 @@ class IJCAI(Conference):
 
 
 class CVF(Conference):
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         available_confs = ['CVPR', 'ICCV']
         venue_name = self.venue_name.upper()
         if venue_name not in available_confs:
-            utils.print_and_exit(f'error: unknown conference {venue_name}')
+            logging.error(f'error: unknown conference {venue_name}')
+            return None
 
         return f'https://openaccess.thecvf.com/{venue_name}{self.year}?day=all'
 
@@ -391,14 +388,14 @@ class CVF(Conference):
 
 
 class ECCV(Conference):
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return 'https://www.ecva.net/papers.php'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         start_year = 2018
         if self.year < start_year:
-            utils.print_and_exit(
-                f'{self.__class__.__name__}: Unsupported year: {self.year}, must be [{start_year}, Now]')
+            logging.error(f'{self.__class__.__name__}: Unsupported year: {self.year}, must be [{start_year}, Now]')
+            return None
 
         parser = html_parser.get_parser(html)
 
@@ -431,7 +428,7 @@ class ECCV(Conference):
 
 class ICLR(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/iclr/iclr{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -451,7 +448,7 @@ class ICLR(Conference):
 
 class ICML(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/icml/icml{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -475,7 +472,7 @@ class ICML(Conference):
 
 class NeurIPS(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         if self.year <= 2019:
             venue_name = 'nips'
         else:
@@ -495,12 +492,13 @@ class NeurIPS(Conference):
 
 class ACL(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         available_confs = ['acl', 'emnlp', 'naacl']
 
         venue_name = self.venue_name
         if venue_name not in available_confs:
-            utils.print_and_exit(f'error: unknown conference {venue_name}')
+            logging.error(f'error: unknown conference {venue_name}')
+            return None
 
         if ((venue_name == 'acl' and self.year >= 2012)
                 or (venue_name == 'emnlp' and 2019 <= self.year <= 2021)
@@ -523,7 +521,7 @@ class ACL(Conference):
 
 class RSS(Conference):
 
-    def _get_conf_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/rss/rss{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -542,7 +540,7 @@ class RSS(Conference):
 
 class PVLDB(Journal):
 
-    def _get_journal_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://dblp.org/db/journals/pvldb/pvldb{self.volume}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
@@ -557,13 +555,13 @@ class PVLDB(Journal):
 
 class JMLR(Journal):
 
-    def _get_journal_url(self) -> str:
+    def _get_url(self) -> str | None:
         return f'https://jmlr.org/papers/v{self.volume}/'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         parser = html_parser.get_parser(html)
-        paper_title_list = parser.select('dt')
-        paper_url_list = parser.select('a[href$=".pdf"]')
+        paper_title_list = parser.select('dl dt')
+        paper_url_list = parser.select('a[href$=".pdf"][target="_blank"]')
 
         return paper_title_list, paper_url_list
 
