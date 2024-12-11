@@ -434,7 +434,31 @@ class ICLR(Conference):
             return html_parser.parse_href(html, '.download-pdf')
 
         # openreview.net
-        return html_parser.parse_href(html, '.title_pdf_row .note_content_pdf')
+        return html_parser.parse_href(html, 'a[href^="/pdf"]')
+
+    def _get_slides_file_url(self, html: str) -> str:
+        pass
+
+
+class ICML(Conference):
+
+    def _get_conf_url(self) -> str:
+        return f'https://dblp.org/db/conf/icml/icml{self.year}.html'
+
+    def _get_paper_title_and_url_list_by_diy(self) -> Tuple[List[_Tag], List[_Tag]] | None:
+        pass
+
+    def _get_paper_file_url(self, html: str) -> str:
+        # ACM
+        if self.year < 2010:
+            return ""
+
+        # mlr.press
+        if 2010 <= self.year <= 2023:
+            return html_parser.parse_href(html, 'a[href$=".pdf"]')
+
+        # openreview.net
+        return html_parser.parse_href(html, 'a[href^="/pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
@@ -568,6 +592,7 @@ __venue_dict = {
 
     # Machine Learning
     'iclr': ICLR,
+    'icml': ICML,
     'neurips': NeurIPS,
     # alias for 'neurips'
     'nips': NeurIPS,
