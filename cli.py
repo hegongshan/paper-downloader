@@ -1,7 +1,6 @@
 import argparse
 import logging
 from enum import Enum
-from typing import Tuple
 
 import utils
 import venue

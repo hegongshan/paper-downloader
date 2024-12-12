@@ -5,6 +5,7 @@ import random
 import re
 import time
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from enum import Enum
 from typing import Dict, List, Tuple
 
@@ -575,60 +576,62 @@ class JMLR(Journal):
 __venue_dict = {
     # Conference
     # Operating System/Storage System
-    'fast': USENIX,
-    'osdi': USENIX,
-    'atc': USENIX,
+    'fast': {'name': 'FAST', 'publisher': USENIX},
+    'osdi': {'name': 'OSDI', 'publisher': USENIX},
+    'atc': {'name': 'USENIX ATC', 'publisher': USENIX},
 
     # Computer Networks
-    'nsdi': USENIX,
+    'nsdi': {'name': 'NSDI', 'publisher': USENIX},
 
     # Computer security
-    'uss': USENIX,
-    'ndss': NDSS,
+    'uss': {'name': 'USENIX Security', 'publisher': USENIX},
+    'ndss': {'name': 'NDSS', 'publisher': NDSS},
 
     # Artificial Intelligence
-    'aaai': AAAI,
-    'ijcai': IJCAI,
+    'aaai': {'name': 'AAAI', 'publisher': AAAI},
+    'ijcai': {'name': 'IJCAI', 'publisher': IJCAI},
 
     # Computer Vision
-    'cvpr': CVF,
-    'iccv': CVF,
-    'eccv': ECCV,
+    'cvpr': {'name': 'CVPR', 'publisher': CVF},
+    'iccv': {'name': 'ICCV', 'publisher': CVF},
+    'eccv': {'name': 'ECCV', 'publisher': ECCV},
 
     # Machine Learning
-    'iclr': ICLR,
-    'icml': ICML,
-    'neurips': NeurIPS,
+    'iclr': {'name': 'ICLR', 'publisher': ICLR},
+    'icml': {'name': 'ICML', 'publisher': ICML},
+    'neurips': {'name': 'NeurIPS', 'publisher': NeurIPS},
     # alias for 'neurips'
-    'nips': NeurIPS,
+    'nips': {'name': 'NeurIPS', 'publisher': NeurIPS},
 
     # Natural Language Processing
-    'acl': ACL,
-    'emnlp': ACL,
-    'naacl': ACL,
+    'acl': {'name': 'ACL', 'publisher': ACL},
+    'emnlp': {'name': 'EMNLP', 'publisher': ACL},
+    'naacl': {'name': 'NAACL', 'publisher': ACL},
 
     # Robotics
-    'rss': RSS,
+    'rss': {'name': 'RSS', 'publisher': RSS},
 
     # Journal
     # Databases
-    'pvldb': PVLDB,
-    # alias for 'pvldb'
-    'vldb': PVLDB,
+    'pvldb': {'name': 'PVLDB', 'publisher': PVLDB},
 
-    'jmlr': JMLR,
+    'jmlr': {'name': 'JMLR', 'publisher': JMLR},
 }
 
 
-def get_available_venues() -> str:
-    return ','.join(__venue_dict.keys())
+def get_available_venues(lower_case=True) -> str:
+    if lower_case:
+        venues = __venue_dict.keys()
+    else:
+        venues = OrderedDict.fromkeys(v['name'] for k, v in __venue_dict.items())
+    return ','.join(venues)
 
 
-def parse_venue(venue: str) -> Base | None:
+def parse_venue(venue: str) -> type | None:
     venue = venue.lower()
     if venue not in __venue_dict.keys():
         return None
-    return __venue_dict[venue]
+    return __venue_dict[venue]['publisher']
 
 
 def is_conference(venue_publisher: type):
