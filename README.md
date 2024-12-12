@@ -10,9 +10,9 @@ $ pip3 install -r requirements.txt
 
 ```shell
 $ python3 cli.py --help
-usage: cli.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--sleep-time-per-paper SLEEP_TIME_PER_PAPER]
-              [--keyword KEYWORD] [--year YEAR] [--volume VOLUME] [--http-proxy HTTP_PROXY]
-              [--https-proxy HTTPS_PROXY] [--parallel]
+usage: cli.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--log-file LOG_FILE]
+              [--sleep-time-per-paper SLEEP_TIME_PER_PAPER] [--keyword KEYWORD] [--year YEAR]
+              [--volume VOLUME] [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY] [--parallel]
 
 Run PDL.
 
@@ -21,6 +21,7 @@ options:
   --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,icml,neu
                         rips,nips,acl,emnlp,naacl,rss,pvldb,jmlr.
   --save-dir SAVE_DIR   Set a directory to store these papers. (default value: "./paper")
+  --log-file LOG_FILE   The filename of the log. (default value: "paper-downloader.log")
   --sleep-time-per-paper SLEEP_TIME_PER_PAPER
                         The time interval between downloads, measured in seconds. (default value: 2)
   --keyword KEYWORD     The keywords or regex patterns that must be present or matched in the title of the
