@@ -68,7 +68,7 @@ _languages = {
         'resume': '恢复'
     },
     'en': {
-        'window_title': 'APBD4OAV',
+        'window_title': 'APBDOAV',
 
         'language': 'Language',
         'language_switch': 'Switch to Chinese',

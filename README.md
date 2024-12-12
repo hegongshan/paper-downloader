@@ -1,4 +1,4 @@
-### Academic Paper Bulk Downloader for Open Access Venues (APBD4OAV)
+### Academic Paper Bulk Downloader for Open Access Venues (APBDOAV)
 
 #### Install dependencies
 

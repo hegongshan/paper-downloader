@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-from enum import Enum
 
 import utils
 import venue
@@ -10,7 +9,7 @@ default_log_file = 'paper-downloader.log'
 
 
 def parse_args():
-    args = argparse.ArgumentParser(description='Run PDL.')
+    args = argparse.ArgumentParser(description='Run CLI.')
 
     # General options
     args.add_argument('--venue',
