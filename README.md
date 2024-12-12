@@ -11,18 +11,20 @@ $ pip3 install -r requirements.txt
 ```shell
 $ python3 cli.py --help
 usage: cli.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--sleep-time-per-paper SLEEP_TIME_PER_PAPER]
-               [--year YEAR] [--volume VOLUME] [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY]
-               [--parallel]
+              [--keyword KEYWORD] [--year YEAR] [--volume VOLUME] [--http-proxy HTTP_PROXY]
+              [--https-proxy HTTPS_PROXY] [--parallel]
 
 Run PDL.
 
 options:
   -h, --help            show this help message and exit
   --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,icml,neu
-                        rips,nips,acl,emnlp,naacl,rss,pvldb,vldb,jmlr.
+                        rips,nips,acl,emnlp,naacl,rss,pvldb,jmlr.
   --save-dir SAVE_DIR   Set a directory to store these papers. (default value: "./paper")
   --sleep-time-per-paper SLEEP_TIME_PER_PAPER
-                        The time interval between downloads, measured in seconds. (default value: 0.2)
+                        The time interval between downloads, measured in seconds. (default value: 2)
+  --keyword KEYWORD     The keywords or regex patterns that must be present or matched in the title of the
+                        paper.
   --year YEAR           The year of the conference.
   --volume VOLUME       The volume number of the journal.
   --http-proxy HTTP_PROXY

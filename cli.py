@@ -24,8 +24,11 @@ def parse_args():
                       help='Set a directory to store these papers. (default value: "./paper")')
     args.add_argument('--sleep-time-per-paper',
                       type=float,
-                      default=0.2,
-                      help='The time interval between downloads, measured in seconds. (default value: 0.2)')
+                      default=2,
+                      help='The time interval between downloads, measured in seconds. (default value: 2)')
+    args.add_argument('--keyword',
+                      type=str,
+                      help='The keywords or regex patterns that must be present or matched in the title of the paper.')
 
     # Conference specific options
     args.add_argument('--year',
@@ -82,12 +85,14 @@ if __name__ == '__main__':
                 f'The journal "{venue_name}" does not require the year field, but it is currently set to "{args.year}".')
 
     # instantiate venue
+    logging.info(args)
     publisher = venue_publisher(save_dir=args.save_dir,
                                 sleep_time_per_paper=args.sleep_time_per_paper,
+                                keyword=args.keyword,
                                 venue_name=venue_name,
-                                year=args.year if args.year else None,
-                                volume=args.volume if args.volume else None,
+                                year=args.year,
+                                volume=args.volume,
                                 parallel=args.parallel,
-                                proxies=proxies if proxies else None)
+                                proxies=proxies)
     publisher.process()
     utils.print_success('Task Done!')

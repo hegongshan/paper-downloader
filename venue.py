@@ -30,11 +30,13 @@ class Base(ABC):
     def __init__(self,
                  save_dir: str,
                  sleep_time_per_paper: float,
+                 keyword: str = None,
                  parallel: bool = False,
                  proxies: Dict[str, str] = None,
                  **kwargs):
         self.save_dir = save_dir
         self.sleep_time_per_paper = sleep_time_per_paper
+        self.keyword = keyword
         self.parallel = parallel
         self.proxies = proxies
 
@@ -76,10 +78,17 @@ class Base(ABC):
                 for paper_entry in tqdm(paper_list):
                     self._process_one(paper_entry)
 
-    def _process_one(self, paper_info: Tuple[str, str]):
+    def _process_one(self, paper_info: Tuple[str, str]) -> None:
         paper_title, paper_url = paper_info
-
         pid = os.getpid()
+
+        # match keyword
+        if self.keyword:
+            match_result = re.search(self.keyword, paper_title, re.RegexFlag.IGNORECASE)
+            if not match_result:
+                logging.info(f'(pid {pid}) The paper "{paper_title}" does not contain the required keywords!')
+                return None
+
         if self._paper_url_is_file_url(paper_url):
             logging.info(f'(pid {pid}) downloading paper: {paper_url}')
             self._download_paper(paper_url, paper_title)
@@ -631,9 +640,9 @@ def get_available_venues(lower_case=True) -> str:
     return ','.join(get_available_venue_list(lower_case=lower_case))
 
 
-def get_lower_name(venue_name: str) -> str | None:
+def get_lower_name(upper_venue_name: str) -> str | None:
     for k, v in __venue_dict.items():
-        if v['name'] == venue_name:
+        if v['name'] == upper_venue_name:
             return k
     return None
 

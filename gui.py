@@ -29,7 +29,7 @@ _venues = venue.get_available_venues(lower_case=False)
 
 _languages = {
     'cn': {
-        'window_title': '开源论文批量下载器',
+        'window_title': '面向开放获取刊物的学术论文批量下载器',
 
         'language': '语言',
         'language_switch': '切换到英文',
@@ -53,9 +53,11 @@ _languages = {
         'log': '日志',
         'venue_label': '会议:',
         'save_dir_label': '保存目录:',
+        'sleep_time_label': '每篇论文间隔时间 (秒):',
+        'keyword': '关键词:',
+        'keyword_placeholder': '支持正则表达式',
         'year_label': '年份 (仅限会议):',
         'volume_label': '卷号 (仅限期刊):',
-        'sleep_time_label': '每篇论文间隔时间 (秒):',
         'http_proxy_label': 'HTTP 代理:',
         'https_proxy_label': 'HTTPS 代理:',
         'parallel': '并行:',
@@ -90,9 +92,11 @@ _languages = {
         'log': 'Log',
         'venue_label': 'Venue:',
         'save_dir_label': 'Save Directory:',
+        'sleep_time_label': 'Sleep time per paper(second):',
+        'keyword': 'Keyword:',
+        'keyword_placeholder': 'Support regular expressions.',
         'year_label': 'Year (Conference Only):',
         'volume_label': 'Volume (Journal only):',
-        'sleep_time_label': 'Sleep time per paper(second):',
         'http_proxy_label': 'HTTP Proxy:',
         'https_proxy_label': 'HTTPS Proxy:',
         'parallel': 'Parallel:',
@@ -219,8 +223,14 @@ class PaperDownloaderGUI(QMainWindow):
 
         self.sleep_time_label = QLabel(_languages[self.current_language]['sleep_time_label'])
         basic_layout.addWidget(self.sleep_time_label, 2, 0)
-        self.sleep_time_input = QLineEdit('0.2')
+        self.sleep_time_input = QLineEdit('2')
         basic_layout.addWidget(self.sleep_time_input, 2, 1)
+
+        self.keyword_label = QLabel(_languages[self.current_language]['keyword'])
+        basic_layout.addWidget(self.keyword_label, 3, 0)
+        self.keyword_input = QLineEdit()
+        self.keyword_input.setPlaceholderText(_languages[self.current_language]['keyword_placeholder'])
+        basic_layout.addWidget(self.keyword_input, 3, 1)
 
         self.basic_settings.setLayout(basic_layout)
         main_layout.addWidget(self.basic_settings)
@@ -321,6 +331,8 @@ class PaperDownloaderGUI(QMainWindow):
         self.venue_label.setText(_languages[self.current_language]['venue_label'])
         self.save_dir_label.setText(_languages[self.current_language]['save_dir_label'])
         self.sleep_time_label.setText(_languages[self.current_language]['sleep_time_label'])
+        self.keyword_label.setText(_languages[self.current_language]['keyword'])
+        self.keyword_input.setPlaceholderText(_languages[self.current_language]['keyword_placeholder'])
 
         self.year_label.setText(_languages[self.current_language]['year_label'])
         self.volume_label.setText(_languages[self.current_language]['volume_label'])
@@ -342,8 +354,9 @@ class PaperDownloaderGUI(QMainWindow):
     def run_downloader(self):
         venue_name = self.venue_input.currentText().strip()
         save_dir = self.save_dir_input.text().strip()
-        year = self.year_input.text().strip()
         sleep_time_per_paper = self.sleep_time_input.text().strip()
+        keyword = self.keyword_input.text().strip()
+        year = self.year_input.text().strip()
         volume = self.volume_input.text().strip()
         http_proxy = self.http_proxy_input.text().strip()
         https_proxy = self.https_proxy_input.text().strip()
@@ -396,7 +409,7 @@ class PaperDownloaderGUI(QMainWindow):
                     f'Warning: The journal "{venue_name}" does not require the year field, but it is currently set to "{year}".')
 
         try:
-            sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else 0.2
+            sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else 2
         except ValueError:
             QMessageBox.warning(self, 'Input Error', '"Sleep time" must be a number.')
             return
@@ -414,11 +427,12 @@ class PaperDownloaderGUI(QMainWindow):
         publisher = venue_publisher(
             save_dir=save_dir,
             sleep_time_per_paper=sleep_time_per_paper,
+            keyword=keyword,
             venue_name=venue_name_lower,
-            year=year if year else None,
-            volume=volume if volume else None,
+            year=year,
+            volume=volume,
             parallel=parallel,
-            proxies=proxies if proxies else None
+            proxies=proxies
         )
 
         # 创建线程
