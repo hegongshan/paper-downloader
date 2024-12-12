@@ -9,7 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
-    QButtonGroup, QMainWindow, QMenu, QAction
+    QButtonGroup, QMainWindow, QMenu, QAction, QComboBox
 )
 
 
@@ -204,7 +204,8 @@ class PaperDownloaderGUI(QMainWindow):
 
         self.venue_label = QLabel(_languages[self.current_language]['venue_label'])
         basic_layout.addWidget(self.venue_label, 0, 0)
-        self.venue_input = QLineEdit()
+        self.venue_input = QComboBox()
+        self.venue_input.addItems(venue.get_available_venue_list(lower_case=False))
         basic_layout.addWidget(self.venue_input, 0, 1)
 
         self.save_dir_label = QLabel(_languages[self.current_language]['save_dir_label'])
@@ -339,7 +340,7 @@ class PaperDownloaderGUI(QMainWindow):
             self.save_dir_input.setText(directory)
 
     def run_downloader(self):
-        venue_name = self.venue_input.text().strip()
+        venue_name = self.venue_input.currentText().strip()
         save_dir = self.save_dir_input.text().strip()
         year = self.year_input.text().strip()
         sleep_time_per_paper = self.sleep_time_input.text().strip()
@@ -359,7 +360,7 @@ class PaperDownloaderGUI(QMainWindow):
             return
 
         # 解析venue
-        venue_name_lower = venue_name.lower()
+        venue_name_lower = venue.get_lower_name(venue_name)
         venue_publisher = venue.parse_venue(venue_name_lower)
         if not venue_publisher:
             QMessageBox.warning(self, 'Input Error', f'Unsupported venue: {venue_name_lower}')

@@ -619,12 +619,23 @@ __venue_dict = {
 }
 
 
-def get_available_venues(lower_case=True) -> str:
+def get_available_venue_list(lower_case=True) -> List[str]:
     if lower_case:
         venues = __venue_dict.keys()
     else:
         venues = OrderedDict.fromkeys(v['name'] for k, v in __venue_dict.items())
-    return ','.join(venues)
+    return list(venues)
+
+
+def get_available_venues(lower_case=True) -> str:
+    return ','.join(get_available_venue_list(lower_case=lower_case))
+
+
+def get_lower_name(venue_name: str) -> str | None:
+    for k, v in __venue_dict.items():
+        if v['name'] == venue_name:
+            return k
+    return None
 
 
 def parse_venue(venue: str) -> type | None:
