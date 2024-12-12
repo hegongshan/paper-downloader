@@ -9,7 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
-    QButtonGroup
+    QButtonGroup, QMainWindow, QMenu, QAction
 )
 
 
@@ -30,11 +30,13 @@ _venues = venue.get_available_venues(lower_case=False)
 _languages = {
     'cn': {
         'window_title': '开源论文批量下载器',
-        'language_btn': '切换到英文',
 
+        'language': '语言',
+        'language_switch': '切换到英文',
         'help': '帮助',
-        'help_text': f"""
-            <b>开源论文批量下载器帮助:</b><br>
+        'usage': '使用说明',
+        'usage_text': f"""
+            <b>开源论文批量下载器:</b><br>
             <ul>
                 <li>在“基本设置”中填写必填字段。</li>
                 <li>配置可选参数、代理和高级设置。</li>
@@ -65,10 +67,13 @@ _languages = {
     },
     'en': {
         'window_title': 'APBD4OAV',
-        'language_btn': 'Switch to Chinese',
+
+        'language': 'Language',
+        'language_switch': 'Switch to Chinese',
         'help': 'Help',
-        'help_text': f"""
-            <b>Academic Paper Bulk Downloader for Open Access Venues Help:</b><br>
+        'usage': 'Usage',
+        'usage_text': f"""
+            <b>Academic Paper Bulk Downloader for Open Access Venues:</b><br>
             <ul>
                 <li>Fill in the required fields under Basic Settings.</li>
                 <li>Configure optional parameters, proxies, and advanced settings.</li>
@@ -159,7 +164,7 @@ class DownloaderThread(QThread):
 
 # -------------------------------------------
 # GUI类定义
-class PaperDownloaderGUI(QWidget):
+class PaperDownloaderGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_language = 'en'  # Initialize default language
@@ -171,24 +176,27 @@ class PaperDownloaderGUI(QWidget):
             with open("gui.qss", "r", encoding="utf-8") as f:
                 qss = f.read()
         except IOError:
-            utils.print_and_exit('can not find stylesheet.')
+            utils.print_and_exit('cannot find stylesheet.')
         self.setStyleSheet(qss)
 
+        # Menu Bar
+        menubar = self.menuBar()
+        self.language_menu = QMenu(_languages[self.current_language]['language'], self)
+        self.language_action = QAction(_languages[self.current_language]['language_switch'], self)
+        self.language_action.triggered.connect(self.toggle_language)
+        self.language_menu.addAction(self.language_action)
+        menubar.addMenu(self.language_menu)
+
+        self.help_menu = QMenu(_languages[self.current_language]['help'], self)
+        self.help_action = QAction(_languages[self.current_language]['usage'], self)
+        self.help_action.triggered.connect(self.show_usage_dialog)
+        self.help_menu.addAction(self.help_action)
+        menubar.addMenu(self.help_menu)
+
+        central_widget = QWidget(self)
+        self.setCentralWidget(central_widget)
+
         main_layout = QVBoxLayout()
-        lang_help_layout = QHBoxLayout()
-
-        # Language Switch Button
-        self.language_button = QPushButton(_languages[self.current_language]['language_btn'])
-        self.language_button.clicked.connect(self.toggle_language)
-        lang_help_layout.addWidget(self.language_button)
-
-        # Help Button
-        self.help_button = QPushButton(_languages[self.current_language]['help'])
-        self.help_button.clicked.connect(self.show_help_dialog)
-        lang_help_layout.addWidget(self.help_button)
-
-        lang_help_layout.addStretch(1)
-        main_layout.addLayout(lang_help_layout)
 
         # Group 1: Basic Settings
         self.basic_settings = QGroupBox(_languages[self.current_language]['basic_settings'])
@@ -286,7 +294,7 @@ class PaperDownloaderGUI(QWidget):
         self.log_group.setLayout(log_layout)
         main_layout.addWidget(self.log_group)
 
-        self.setLayout(main_layout)
+        central_widget.setLayout(main_layout)
 
     def toggle_language(self):
         if self.current_language == 'en':
@@ -297,8 +305,12 @@ class PaperDownloaderGUI(QWidget):
 
     def update_language(self):
         self.setWindowTitle(_languages[self.current_language]['window_title'])
-        self.language_button.setText(_languages[self.current_language]['language_btn'])
-        self.help_button.setText(_languages[self.current_language]['help'])
+
+        self.language_menu.setTitle(_languages[self.current_language]['language'])
+        self.language_action.setText(_languages[self.current_language]['language_switch'])
+        self.help_menu.setTitle(_languages[self.current_language]['help'])
+        self.help_action.setText(_languages[self.current_language]['usage'])
+
         self.basic_settings.setTitle(_languages[self.current_language]['basic_settings'])
         self.browse_button.setText(_languages[self.current_language]['browse_btn'])
         self.additional_params.setTitle(_languages[self.current_language]['additional_params'])
@@ -449,10 +461,10 @@ class PaperDownloaderGUI(QWidget):
         self.run_button.setEnabled(True)
         self.pause_button.setEnabled(False)
 
-    def show_help_dialog(self):
+    def show_usage_dialog(self):
         QMessageBox.information(self,
-                                _languages[self.current_language]['help'],
-                                _languages[self.current_language]['help_text'])
+                                _languages[self.current_language]['usage'],
+                                _languages[self.current_language]['usage_text'])
 
 
 if __name__ == '__main__':
