@@ -2,13 +2,14 @@ import logging
 import os
 import sys
 import threading
-
+from bs4 import BeautifulSoup
 import utils
 import venue
+
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox
+    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox
 )
 
 
@@ -86,91 +87,153 @@ class DownloaderThread(QThread):
 class PaperDownloaderGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.thread = None
+        self.current_language = 'English'  # Initialize default language
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Paper Bulk Downloader')
+        self.setWindowTitle('Paper Bulk Downloader for Open Access Venues')
+        with open("gui.qss", "r", encoding="utf-8") as f:
+            qss = f.read()
+        self.setStyleSheet(qss)
 
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout()
+        lang_help_layout = QHBoxLayout()
 
-        # Venue输入
-        venue_layout = QHBoxLayout()
-        venue_layout.addWidget(QLabel('Venue:'))
+        # Language Switch Button
+        self.language_button = QPushButton('Switch to Chinese')
+        self.language_button.clicked.connect(self.toggle_language)
+        lang_help_layout.addWidget(self.language_button)
+
+        # Help Button
+        self.help_button = QPushButton('Help')
+        self.help_button.clicked.connect(self.show_help_dialog)
+        lang_help_layout.addWidget(self.help_button)
+
+        lang_help_layout.addStretch(1)
+        main_layout.addLayout(lang_help_layout)
+
+        # Group 1: Basic Settings
+        self.basic_settings = QGroupBox("Basic Settings")
+        basic_layout = QGridLayout()
+
+        self.venue_label = QLabel('Venue:')
+        basic_layout.addWidget(self.venue_label, 0, 0)
         self.venue_input = QLineEdit()
-        venue_layout.addWidget(self.venue_input)
+        basic_layout.addWidget(self.venue_input, 0, 1)
 
-        # 保存目录
-        save_dir_layout = QHBoxLayout()
-        save_dir_layout.addWidget(QLabel('Save Directory:'))
+        self.save_dir_label = QLabel('Save Directory:')
+        basic_layout.addWidget(self.save_dir_label, 1, 0)
         self.save_dir_input = QLineEdit()
-        save_dir_layout.addWidget(self.save_dir_input)
-        save_dir_btn = QPushButton('Browse')
-        save_dir_btn.clicked.connect(self.select_save_dir)
-        save_dir_layout.addWidget(save_dir_btn)
+        basic_layout.addWidget(self.save_dir_input, 1, 1)
+        self.browse_button = QPushButton('Browse')
+        self.browse_button.clicked.connect(self.select_save_dir)
+        basic_layout.addWidget(self.browse_button, 1, 2)
 
-        # 年份
-        year_layout = QHBoxLayout()
-        year_layout.addWidget(QLabel('Year:'))
+        self.basic_settings.setLayout(basic_layout)
+        main_layout.addWidget(self.basic_settings)
+
+        # Group 2: Additional Parameters
+        self.additional_params = QGroupBox("Additional Settings")
+        params_layout = QGridLayout()
+
+        self.year_label = QLabel('Year (Conference Only):')
+        params_layout.addWidget(self.year_label, 0, 0)
         self.year_input = QLineEdit()
-        year_layout.addWidget(self.year_input)
+        params_layout.addWidget(self.year_input, 0, 1)
 
-        # 下载间隔
-        sleep_time_layout = QHBoxLayout()
-        sleep_time_layout.addWidget(QLabel('Sleep time per paper (s):'))
+        self.sleep_time_label = QLabel('Sleep time per paper(second):')
+        params_layout.addWidget(self.sleep_time_label, 1, 0)
         self.sleep_time_input = QLineEdit('0.2')
-        sleep_time_layout.addWidget(self.sleep_time_input)
+        params_layout.addWidget(self.sleep_time_input, 1, 1)
 
-        # Volume（可选）
-        volume_layout = QHBoxLayout()
-        volume_layout.addWidget(QLabel('Volume (Journal only):'))
+        self.volume_label = QLabel('Volume (Journal only):')
+        params_layout.addWidget(self.volume_label, 2, 0)
         self.volume_input = QLineEdit()
-        volume_layout.addWidget(self.volume_input)
+        params_layout.addWidget(self.volume_input, 2, 1)
 
-        # HTTP/HTTPS Proxy
-        proxy_layout = QHBoxLayout()
-        proxy_layout.addWidget(QLabel('HTTP Proxy:'))
+        self.additional_params.setLayout(params_layout)
+        main_layout.addWidget(self.additional_params)
+
+        # Group 3: Advanced Settings
+        self.advanced_settings = QGroupBox("Advanced Settings")
+        combined_layout = QVBoxLayout()
+
+        proxy_layout = QGridLayout()
+        self.http_proxy_label = QLabel('HTTP Proxy:')
+        proxy_layout.addWidget(self.http_proxy_label, 0, 0)
         self.http_proxy_input = QLineEdit()
-        proxy_layout.addWidget(self.http_proxy_input)
-        proxy_layout.addWidget(QLabel('HTTPS Proxy:'))
+        proxy_layout.addWidget(self.http_proxy_input, 0, 1)
+
+        self.https_proxy_label = QLabel('HTTPS Proxy:')
+        proxy_layout.addWidget(self.https_proxy_label, 1, 0)
         self.https_proxy_input = QLineEdit()
-        proxy_layout.addWidget(self.https_proxy_input)
+        proxy_layout.addWidget(self.https_proxy_input, 1, 1)
 
-        # Parallel
-        parallel_layout = QHBoxLayout()
-        parallel_layout.addWidget(QLabel('Parallel:'))
-        self.parallel_button = QPushButton("Disabled")
+        combined_layout.addLayout(proxy_layout)
+
+        execution_layout = QHBoxLayout()
+        self.parallel_button = QPushButton("Parallel: Disabled")
         self.parallel_button.setCheckable(True)
-        self.parallel_button.toggled.connect(self.toggle_parallel)
-        parallel_layout.addWidget(self.parallel_button)
+        execution_layout.addWidget(self.parallel_button)
+        combined_layout.addLayout(execution_layout)
 
-        # 按钮区：Run / Pause / Resume
-        button_layout = QHBoxLayout()
-        self.run_button = QPushButton('Run')
-        self.run_button.clicked.connect(self.run_downloader)
-        button_layout.addWidget(self.run_button)
+        self.advanced_settings.setLayout(combined_layout)
+        main_layout.addWidget(self.advanced_settings)
 
-        self.pause_button = QPushButton('Pause')
-        self.pause_button.setEnabled(False)
-        self.pause_button.clicked.connect(self.toggle_pause)
-        button_layout.addWidget(self.pause_button)
-
-        # 日志显示
-        layout.addLayout(venue_layout)
-        layout.addLayout(save_dir_layout)
-        layout.addLayout(year_layout)
-        layout.addLayout(sleep_time_layout)
-        layout.addLayout(volume_layout)
-        layout.addLayout(proxy_layout)
-        layout.addLayout(parallel_layout)
-        layout.addLayout(button_layout)
-
-        layout.addWidget(QLabel('Logs:'))
+        # Logs Section
+        self.log_group = QGroupBox("Logs")
+        log_layout = QVBoxLayout()
         self.log_output = QTextEdit()
-        self.log_output.setReadOnly(True)
-        layout.addWidget(self.log_output)
+        log_layout.addWidget(self.log_output)
+        self.log_group.setLayout(log_layout)
+        main_layout.addWidget(self.log_group)
 
-        self.setLayout(layout)
+        self.setLayout(main_layout)
+
+    def toggle_language(self):
+        if self.current_language == 'English':
+            self.current_language = 'Chinese'
+        else:
+            self.current_language = 'English'
+        self.update_language()
+
+    def update_language(self):
+        if self.current_language == 'Chinese':
+            self.setWindowTitle('开源论文批量下载器')
+            self.language_button.setText('切换到英文')
+            self.help_button.setText("帮助")
+            self.basic_settings.setTitle('基本设置')
+            self.browse_button.setText("浏览")
+            self.additional_params.setTitle('附加设置')
+            self.advanced_settings.setTitle('高级设置')
+            self.log_group.setTitle('日志')
+
+            self.venue_label.setText('会议:')
+            self.save_dir_label.setText('保存目录:')
+            self.year_label.setText('年份 (仅限会议):')
+            self.sleep_time_label.setText('每篇论文间隔时间 (秒):')
+            self.volume_label.setText('卷号 (仅限期刊):')
+            self.http_proxy_label.setText('HTTP 代理:')
+            self.https_proxy_label.setText('HTTPS 代理:')
+            self.parallel_button.setText('并行: 禁用')
+        else:
+            self.setWindowTitle('Paper Bulk Downloader')
+            self.language_button.setText('Switch to Chinese')
+            self.help_button.setText("Help")
+            self.basic_settings.setTitle('Basic Settings')
+            self.browse_button.setText('Browse')
+            self.additional_params.setTitle('Additional Settings')
+            self.advanced_settings.setTitle('Advanced Settings')
+            self.log_group.setTitle('Logs')
+
+            self.venue_label.setText('Venue:')
+            self.save_dir_label.setText('Save Directory:')
+            self.year_label.setText('Year (Conference Only):')
+            self.sleep_time_label.setText('Sleep time per paper(second):')
+            self.volume_label.setText('Volume (Journal only):')
+            self.http_proxy_label.setText('HTTP Proxy:')
+            self.https_proxy_label.setText('HTTPS Proxy:')
+            self.parallel_button.setText('Parallel: Disabled')
 
     def select_save_dir(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Save Directory')
@@ -305,6 +368,94 @@ class PaperDownloaderGUI(QWidget):
         self.log_output.append(msg)
         self.run_button.setEnabled(True)
         self.pause_button.setEnabled(False)
+
+    def get_conf_jounal(self):
+
+        with open("README.md", "r", encoding="utf-8") as f:
+            content = f.read()
+
+        soup = BeautifulSoup(content, "html.parser")
+        table = soup.find("table")
+        if not table:
+            return ""
+
+        headers = [th.get_text(strip=True) for th in table.find("tr").find_all("th")]
+        if "Conf/Journal" not in headers:
+            return ""
+
+        conf_col_index = headers.index("Conf/Journal")
+        rows = table.find_all("tr")[1:]
+        result = []
+        rowspan_map = {}
+
+        for row in rows:
+            cells = row.find_all(["td", "th"])
+            current_row = []
+            col_index = 0
+
+            for cell in cells:
+                while col_index in rowspan_map and rowspan_map[col_index][0] > 0:
+                    current_row.append(rowspan_map[col_index][1])
+                    rowspan_map[col_index][0] -= 1
+                    if rowspan_map[col_index][0] == 0:
+                        del rowspan_map[col_index]
+                    col_index += 1
+
+                text = cell.get_text(strip=True)
+                rowspan = int(cell.get("rowspan", 1))
+                colspan = int(cell.get("colspan", 1))
+
+                for _ in range(colspan):
+                    current_row.append(text)
+                    if rowspan > 1:
+                        rowspan_map[col_index] = [rowspan - 1, text]
+                    col_index += 1
+
+            while col_index in rowspan_map and rowspan_map[col_index][0] > 0:
+                current_row.append(rowspan_map[col_index][1])
+                rowspan_map[col_index][0] -= 1
+                if rowspan_map[col_index][0] == 0:
+                    del rowspan_map[col_index]
+                col_index += 1
+
+            result.append(current_row)
+
+        conf_journal_data = [row[conf_col_index] for row in result if len(row) > conf_col_index]
+        conf_journal_string = ", ".join(conf_journal_data)
+        print("Conf/Journal 列的字符串数据：", conf_journal_string)
+        return conf_journal_string
+
+    def show_help_dialog(self):
+        publications = self.get_conf_jounal()
+        if not publications:
+            publications = "None"
+        if self.current_language == 'Chinese':
+            help_text = f"""
+            <b>开源论文批量下载器帮助:</b><br>
+            <ul>
+                <li>在“基本设置”中填写必填字段。</li>
+                <li>配置可选参数、代理和高级设置。</li>
+                <li>点击“运行”按钮开始下载，或点击“暂停”按钮暂停。</li>
+                <li>使用“切换到英文”按钮切换语言。</li>
+            </ul>
+            <p>目前可直接下载的论文:<b>{publications}</b><p>
+            
+            """
+            title = '帮助'
+        else:
+            help_text = f"""
+            <b>Paper Bulk Downloader for OPen Access Venues Help:</b><br>
+            <ul>
+                <li>Fill in the required fields under Basic Settings.</li>
+                <li>Configure optional parameters, proxies, and advanced settings.</li>
+                <li>Click "Run" to start downloading, or "Pause" to pause.</li>
+                <li>Use the "Switch to Chinese" button to toggle languages.</li>
+            </ul>
+            <p>Currently supported publications:<b>{publications}</b></p>
+            """
+            title = 'Help'
+
+        QMessageBox.information(self, title, help_text)
 
 
 if __name__ == '__main__':
