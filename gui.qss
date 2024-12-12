@@ -1,6 +1,6 @@
 QWidget {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #eeeeee);
-    font-family: "Segoe UI", Arial, sans-serif;
+    /*font-family: "Segoe UI", Arial, sans-serif;*/
     font-size: 14px;
     color: #333333;
 }
