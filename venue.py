@@ -39,6 +39,7 @@ class Base(ABC):
         self.keyword = keyword
         self.parallel = parallel
         self.proxies = proxies
+        self.pause_stop_callback = None
 
         if 'venue_name' in kwargs:
             self.venue_name = kwargs['venue_name']
@@ -70,15 +71,23 @@ class Base(ABC):
             self._process_one(test_paper)
         else:
             if self.parallel:
-                with mp.Pool(processes=mp.cpu_count()) as pool:
+                with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+                    future_to_paper = {executor.submit(self._process_one, paper): paper for paper in paper_list}
                     with tqdm(total=len(paper_list)) as progress_bar:
-                        for _ in pool.imap_unordered(self._process_one, paper_list):
+                        for future in as_completed(future_to_paper):
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logging.error(f'Error processing paper: {e}')
                             progress_bar.update(1)
             else:
                 for paper_entry in tqdm(paper_list):
                     self._process_one(paper_entry)
 
     def _process_one(self, paper_info: Tuple[str, str]) -> None:
+        if self.pause_stop_callback:
+            self.pause_stop_callback()
+
         paper_title, paper_url = paper_info
         pid = os.getpid()
 
@@ -112,6 +121,9 @@ class Base(ABC):
 
         if self.sleep_time_per_paper:
             time.sleep(self.sleep_time_per_paper)
+
+    def set_pause_stop_callback(self, callback):
+        self.pause_stop_callback = callback
 
     @staticmethod
     def _paper_url_is_file_url(paper_url: str) -> bool:

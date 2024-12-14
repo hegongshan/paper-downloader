@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import threading
-
 import utils
 import venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
@@ -11,7 +10,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox
 )
-
+from log_handler import QtLogHandler
 
 # -------------------------------------------
 # 在GUI中显示日志的Logging Handler
@@ -64,6 +63,7 @@ _languages = {
         'enable': '启用',
         'disable': '禁用',
         'run': '运行',
+        'stop': '停止',
         'pause': '暂停',
         'resume': '恢复'
     },
@@ -103,6 +103,7 @@ _languages = {
         'enable': 'Enable',
         'disable': 'Disable',
         'run': 'Run',
+        'stop': 'Stop',
         'pause': 'Pause',
         'resume': 'Resume'
     }
@@ -116,9 +117,8 @@ class DownloaderThread(QThread):
     error_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, publisher: type):
+    def __init__(self, publisher):
         super().__init__()
-
         self.publisher = publisher
 
         self.paused = False
@@ -130,24 +130,41 @@ class DownloaderThread(QThread):
         self.mutex.lock()
         self.paused = True
         self.mutex.unlock()
+        self.log_signal.emit("Download paused.")
 
     def resume(self):
         self.mutex.lock()
         self.paused = False
         self.pause_condition.wakeAll()
         self.mutex.unlock()
+        self.log_signal.emit("Download resumed.")
 
-    def check_paused(self):
+    def stop(self):
         self.mutex.lock()
+        self.stop_flag = True
+        if self.paused:
+            self.paused = False
+            self.pause_condition.wakeAll()
+        self.mutex.unlock()
+        self.log_signal.emit("Download stopping...")
+
+    def check_paused_or_stopped(self):
+        self.mutex.lock()
+        if self.stop_flag:
+            self.mutex.unlock()
+            raise Exception("Download stopped by user.")
         while self.paused:
             self.pause_condition.wait(self.mutex)
+            if self.stop_flag:
+                self.mutex.unlock()
+                raise Exception("Download stopped by user.")
         self.mutex.unlock()
 
     def run(self):
         try:
             logger = logging.getLogger()
             logger.setLevel(logging.INFO)
-            # 清除原有handler，添加我们的handler
+            # 清除现有的 handler
             for h in logger.handlers[:]:
                 logger.removeHandler(h)
 
@@ -155,8 +172,12 @@ class DownloaderThread(QThread):
             stream_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
             logger.addHandler(stream_handler)
 
-            # 注意：目前没有对publisher内部流程进行暂停逻辑的插入
-            # 如需暂停，需要在publisher.process()内部适当位置调用self.check_paused()
+            # 设置暂停和停止的回调
+            if hasattr(self.publisher, 'set_pause_stop_callback'):
+                self.publisher.set_pause_stop_callback(self.check_paused_or_stopped)
+            else:
+                self.log_signal.emit(f"Warning: Publisher '{self.publisher.venue_name}' does not support pause/resume.")
+                self.error_signal.emit(f"Publisher '{self.publisher.venue_name}' does not support pause/resume.")
 
             self.publisher.process()
 
@@ -291,11 +312,19 @@ class PaperDownloaderGUI(QMainWindow):
         execution_layout = QGridLayout()
         self.run_button = QPushButton(_languages[self.current_language]['run'])
         self.run_button.clicked.connect(self.run_downloader)
-        self.pause_button = QPushButton(_languages[self.current_language]['pause'])
-        self.pause_button.clicked.connect(self.toggle_pause)
+        self.stop_button = QPushButton(_languages[self.current_language]['stop'])
+        self.stop_button.clicked.connect(self.stop_downloader)
+        self.pause_resume_button = QPushButton(_languages[self.current_language]['pause'])
+        self.pause_resume_button.clicked.connect(self.toggle_pause_resume)
         execution_layout.addWidget(self.run_button, 0, 0)
-        execution_layout.addWidget(self.pause_button, 0, 1)
+        execution_layout.addWidget(self.stop_button, 0, 1)
+        execution_layout.addWidget(self.pause_resume_button, 0, 2)
         main_layout.addLayout(execution_layout)
+
+        # 初始化按钮状态
+        self.run_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.pause_resume_button.setEnabled(False)
 
         # Logs Section
         self.log_group = QGroupBox(_languages[self.current_language]['log'])
@@ -344,7 +373,11 @@ class PaperDownloaderGUI(QMainWindow):
         self.parallel_disable_button.setText(_languages[self.current_language]['disable'])
 
         self.run_button.setText(_languages[self.current_language]['run'])
-        self.pause_button.setText(_languages[self.current_language]['pause'])
+        self.stop_button.setText(_languages[self.current_language]['stop'])
+        if self.thread and self.thread.paused:
+            self.pause_resume_button.setText(_languages[self.current_language]['resume'])
+        else:
+            self.pause_resume_button.setText(_languages[self.current_language]['pause'])
 
     def select_save_dir(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Save Directory')
@@ -369,7 +402,7 @@ class PaperDownloaderGUI(QMainWindow):
             return
 
         if not save_dir:
-            QMessageBox.warning(self, 'Input Error', '"Save directory" is a required field..')
+            QMessageBox.warning(self, 'Input Error', '"Save directory" is a required field.')
             return
 
         # 解析venue
@@ -424,7 +457,7 @@ class PaperDownloaderGUI(QMainWindow):
             proxies['https'] = https_proxy
 
         # 实例化publisher
-        publisher = venue_publisher(
+        publisher_instance = venue_publisher(
             save_dir=save_dir,
             sleep_time_per_paper=sleep_time_per_paper,
             keyword=keyword,
@@ -436,27 +469,47 @@ class PaperDownloaderGUI(QMainWindow):
         )
 
         # 创建线程
-        self.thread = DownloaderThread(publisher=publisher)
+        self.thread = DownloaderThread(publisher=publisher_instance)
         self.thread.log_signal.connect(self.append_log)
         self.thread.error_signal.connect(self.show_error)
         self.thread.finished_signal.connect(self.task_finished)
         self.thread.start()
 
+        # 更新按钮状态
         self.run_button.setEnabled(False)
-        self.pause_button.setEnabled(True)
-        self.pause_button.setText(_languages[self.current_language]['pause'])
+        self.stop_button.setEnabled(True)
+        self.pause_resume_button.setEnabled(True)
+        self.pause_resume_button.setText(_languages[self.current_language]['pause'])
 
-    def toggle_pause(self):
+    def stop_downloader(self):
+        if self.thread and self.thread.isRunning():
+            confirm = QMessageBox.question(
+                self, 'Confirm Stop', 'Are you sure you want to stop the download?',
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if confirm == QMessageBox.Yes:
+                self.thread.stop()
+                self.thread.wait()  # 等待线程结束
+                self.log_output.append("Download stopped.")
+                self.run_button.setEnabled(True)
+                self.stop_button.setEnabled(False)
+                self.pause_resume_button.setEnabled(False)
+                self.pause_resume_button.setText(_languages[self.current_language]['pause'])
+        else:
+            QMessageBox.information(self, 'Info', 'No active download to stop.')
+
+    def toggle_pause_resume(self):
         if not self.thread:
             return
         if self.thread.paused:
-            # Resume
+            # 恢复下载
             self.thread.resume()
-            self.pause_button.setText(_languages[self.current_language]['pause'])
+            self.pause_resume_button.setText(_languages[self.current_language]['pause'])
         else:
-            # Pause
+            # 暂停下载
             self.thread.pause()
-            self.pause_button.setText(_languages[self.current_language]['resume'])
+            self.pause_resume_button.setText(_languages[self.current_language]['resume'])
+
 
     @pyqtSlot(str)
     def append_log(self, log):
@@ -467,14 +520,21 @@ class PaperDownloaderGUI(QMainWindow):
     def show_error(self, error):
         QMessageBox.critical(self, 'Error', error)
         self.log_output.append(f"[Error] {error}")
+        # 判断是否与暂停/恢复相关
+        if "does not support pause/resume" in error:
+            self.pause_resume_button.setEnabled(False)
         self.run_button.setEnabled(True)
-        self.pause_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.pause_resume_button.setEnabled(False)
+        self.pause_resume_button.setText(_languages[self.current_language]['pause'])
 
     @pyqtSlot(str)
     def task_finished(self, msg):
         self.log_output.append(msg)
         self.run_button.setEnabled(True)
-        self.pause_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.pause_resume_button.setEnabled(False)
+        self.pause_resume_button.setText(_languages[self.current_language]['pause'])
 
     def show_usage_dialog(self):
         QMessageBox.information(self,
