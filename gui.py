@@ -1,16 +1,19 @@
 import logging
-import os
+import queue
 import sys
-import threading
-import utils
-import venue
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
+from logging.handlers import QueueListener, QueueHandler
+
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox
 )
+
+import utils
+import venue
 from log_handler import QtLogHandler
+
 
 # -------------------------------------------
 # 在GUI中显示日志的Logging Handler
@@ -126,6 +129,10 @@ class DownloaderThread(QThread):
         self.mutex = QMutex()
         self.pause_condition = QWaitCondition()
 
+        self.log_queue = queue.Queue()
+        self.queue_handler = QueueHandler(self.log_queue)
+        self.listener = None
+
     def pause(self):
         self.mutex.lock()
         self.paused = True
@@ -164,13 +171,19 @@ class DownloaderThread(QThread):
         try:
             logger = logging.getLogger()
             logger.setLevel(logging.INFO)
+
             # 清除现有的 handler
             for h in logger.handlers[:]:
                 logger.removeHandler(h)
 
-            stream_handler = QtLogHandler(self.log_signal)
-            stream_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
-            logger.addHandler(stream_handler)
+            # 设置 QueueHandler
+            logger.addHandler(self.queue_handler)
+
+            # 设置 QueueListener
+            qt_log_handler = QtLogHandler(self.log_signal)
+            qt_log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+            self.listener = QueueListener(self.log_queue, qt_log_handler)
+            self.listener.start()
 
             # 设置暂停和停止的回调
             if hasattr(self.publisher, 'set_pause_stop_callback'):
@@ -185,6 +198,10 @@ class DownloaderThread(QThread):
 
         except Exception as e:
             self.error_signal.emit(f"Error: {str(e)}")
+        finally:
+            if self.listener:
+                self.listener.stop()
+                self.listener = None
 
 
 # -------------------------------------------
@@ -509,7 +526,6 @@ class PaperDownloaderGUI(QMainWindow):
             # 暂停下载
             self.thread.pause()
             self.pause_resume_button.setText(_languages[self.current_language]['resume'])
-
 
     @pyqtSlot(str)
     def append_log(self, log):
