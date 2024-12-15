@@ -14,7 +14,7 @@ usage: cli.py [-h] --venue VENUE [--save-dir SAVE_DIR] [--log-file LOG_FILE]
               [--sleep-time-per-paper SLEEP_TIME_PER_PAPER] [--keyword KEYWORD] [--year YEAR]
               [--volume VOLUME] [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY] [--parallel]
 
-Run PDL.
+Run CLI.
 
 options:
   -h, --help            show this help message and exit

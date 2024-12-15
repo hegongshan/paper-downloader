@@ -3,15 +3,14 @@ import queue
 import sys
 from logging.handlers import QueueListener, QueueHandler
 
+import utils
+import venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox
 )
-
-import utils
-import venue
 from log_handler import QtLogHandler
 
 
@@ -68,7 +67,8 @@ _languages = {
         'run': '运行',
         'stop': '停止',
         'pause': '暂停',
-        'resume': '恢复'
+        'resume': '恢复',
+        'clear': '清空'
     },
     'en': {
         'window_title': 'APBDOAV',
@@ -108,7 +108,8 @@ _languages = {
         'run': 'Run',
         'stop': 'Stop',
         'pause': 'Pause',
-        'resume': 'Resume'
+        'resume': 'Resume',
+        'clear': 'Clear'
     }
 }
 
@@ -211,6 +212,7 @@ class PaperDownloaderGUI(QMainWindow):
         super().__init__()
         self.current_language = 'en'  # Initialize default language
         self.init_ui()
+        self.thread = None
 
     def init_ui(self):
         self.setWindowTitle(_languages[self.current_language]['window_title'])
@@ -347,8 +349,17 @@ class PaperDownloaderGUI(QMainWindow):
         self.log_group = QGroupBox(_languages[self.current_language]['log'])
         log_layout = QVBoxLayout()
         self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
         log_layout.addWidget(self.log_output)
+
+        h_layout = QHBoxLayout()
+        h_layout.addStretch(1)
+        self.log_clear_button = QPushButton(_languages[self.current_language]['clear'])
+        self.log_clear_button.clicked.connect(self.clear_log)
+        h_layout.addWidget(self.log_clear_button)
+        log_layout.addLayout(h_layout)
         self.log_group.setLayout(log_layout)
+
         main_layout.addWidget(self.log_group)
 
         central_widget.setLayout(main_layout)
@@ -395,6 +406,8 @@ class PaperDownloaderGUI(QMainWindow):
             self.pause_resume_button.setText(_languages[self.current_language]['resume'])
         else:
             self.pause_resume_button.setText(_languages[self.current_language]['pause'])
+
+        self.log_clear_button.setText(_languages[self.current_language]['clear'])
 
     def select_save_dir(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Save Directory')
@@ -531,6 +544,10 @@ class PaperDownloaderGUI(QMainWindow):
     def append_log(self, log):
         self.log_output.append(log)
         self.log_output.ensureCursorVisible()
+
+    @pyqtSlot()
+    def clear_log(self):
+        self.log_output.clear()
 
     @pyqtSlot(str)
     def show_error(self, error):

@@ -614,7 +614,7 @@ class JMLR(Journal):
         pass
 
 
-__venue_dict = {
+_venue_dict = {
     # Conference
     # Operating System/Storage System
     'fast': {'name': 'FAST', 'publisher': USENIX},
@@ -662,9 +662,9 @@ __venue_dict = {
 
 def get_available_venue_list(lower_case=True) -> List[str]:
     if lower_case:
-        venues = __venue_dict.keys()
+        venues = _venue_dict.keys()
     else:
-        venues = OrderedDict.fromkeys(v['name'] for k, v in __venue_dict.items())
+        venues = OrderedDict.fromkeys(v['name'] for k, v in _venue_dict.items())
     return list(venues)
 
 
@@ -673,17 +673,25 @@ def get_available_venues(lower_case=True) -> str:
 
 
 def get_lower_name(upper_venue_name: str) -> str | None:
-    for k, v in __venue_dict.items():
+    if not upper_venue_name:
+        return None
+
+    for k, v in _venue_dict.items():
         if v['name'] == upper_venue_name:
             return k
+
     return None
 
 
 def parse_venue(venue: str) -> type | None:
-    venue = venue.lower()
-    if venue not in __venue_dict.keys():
+    if not venue:
         return None
-    return __venue_dict[venue]['publisher']
+
+    venue = venue.lower()
+    if venue not in _venue_dict.keys():
+        return None
+
+    return _venue_dict[venue]['publisher']
 
 
 def is_conference(venue_publisher: type):
