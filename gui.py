@@ -120,7 +120,7 @@ class DownloaderThread(QThread):
     error_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, publisher):
+    def __init__(self, publisher: type):
         super().__init__()
         self.publisher = publisher
 

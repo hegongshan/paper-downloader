@@ -169,8 +169,8 @@ class Base(ABC):
 
         if self.url.startswith(self.dblp_url_prefix):
             return self._get_paper_list_by_dblp(paper_list_html)
-        else:
-            return self._get_paper_list_by_diy(paper_list_html)
+
+        return self._get_paper_list_by_diy(paper_list_html)
 
     def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]] | None:
         result_tuple = self._get_paper_title_and_url_list_by_diy(html)
@@ -264,7 +264,7 @@ class Base(ABC):
         pass
 
     @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List, List] | None:
+    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
 
     @abstractmethod
