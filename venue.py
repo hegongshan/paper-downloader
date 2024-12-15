@@ -1,18 +1,21 @@
+import asyncio
 import logging
-import multiprocessing as mp
 import os
 import random
 import re
 import time
 from abc import ABC, abstractmethod
+from asyncio import as_completed
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Tuple
+
+from tqdm import tqdm
 
 import downloader
 import html_parser
 import utils
-from tqdm import tqdm
 
 _Tag = html_parser.Tag
 
@@ -22,10 +25,23 @@ class DBLPVenueType(Enum):
     JOURNAL = 'journals'
 
 
+def ensure_event_loop(func):
+    """装饰器，确保每个线程都有事件循环"""
+
+    def wrapper(*args, **kwargs):
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 ##################################################################
 #                       Abstrace Class                           #
 ##################################################################
-
 class Base(ABC):
     def __init__(self,
                  save_dir: str,
@@ -39,6 +55,9 @@ class Base(ABC):
         self.keyword = keyword
         self.parallel = parallel
         self.proxies = proxies
+
+        # 回调函数，用于在处理前检查暂停/停止状态
+        self.pause_stop_callback = None
 
         if 'venue_name' in kwargs:
             self.venue_name = kwargs['venue_name']
@@ -65,30 +84,44 @@ class Base(ABC):
             logging.error('The paper list is empty!')
             return None
 
+        # 测试模式: 随机抽取一篇论文处理
         if self.test_mode:
             test_paper = random.sample(paper_list, 1)[0]
             self._process_one(test_paper)
-        else:
-            if self.parallel:
-                with mp.Pool(processes=mp.cpu_count()) as pool:
-                    with tqdm(total=len(paper_list)) as progress_bar:
-                        for _ in pool.imap_unordered(self._process_one, paper_list):
-                            progress_bar.update(1)
-            else:
-                for paper_entry in tqdm(paper_list):
-                    self._process_one(paper_entry)
+            return
 
+        if self.parallel:
+            # 并行模式
+            with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+                future_to_paper = {executor.submit(self._process_one, paper): paper for paper in paper_list}
+                with tqdm(total=len(paper_list)) as progress_bar:
+                    for future in as_completed(future_to_paper):
+                        try:
+                            future.result()
+                        except Exception as e:
+                            logging.error(f'Error processing paper: {e}')
+                        progress_bar.update(1)
+        else:
+            # 串行模式
+            for paper_entry in tqdm(paper_list):
+                self._process_one(paper_entry)
+
+    @ensure_event_loop
     def _process_one(self, paper_info: Tuple[str, str]) -> None:
+        if self.pause_stop_callback:
+            self.pause_stop_callback()
+
         paper_title, paper_url = paper_info
         pid = os.getpid()
 
-        # match keyword
+        # 匹配关键词
         if self.keyword:
-            match_result = re.search(self.keyword, paper_title, re.RegexFlag.IGNORECASE)
+            match_result = re.search(self.keyword, paper_title, re.IGNORECASE)
             if not match_result:
                 logging.info(f'(pid {pid}) The paper "{paper_title}" does not contain the required keywords!')
-                return None
+                return
 
+        # 判断URL是否直接是PDF
         if self._paper_url_is_file_url(paper_url):
             logging.info(f'(pid {pid}) downloading paper: {paper_url}')
             self._download_paper(paper_url, paper_title)
@@ -96,22 +129,25 @@ class Base(ABC):
             logging.info(f'(pid {pid}) downloading html: {paper_url}')
             paper_html = downloader.download_html(paper_url, proxies=self.proxies)
             if paper_html is None:
-                return None
+                return
 
             paper_file_url = self._get_paper_file_url(paper_html)
             if paper_file_url is None:
-                return None
+                return
             logging.info(f'(pid {pid}) downloading paper: {paper_file_url}')
             self._download_paper(utils.get_absolute_url(paper_url, paper_file_url), paper_title)
 
             paper_slides_url = self._get_slides_file_url(paper_html)
-            if paper_slides_url is None:
-                return None
-            logging.info(f'(pid {pid}) downloading slides: {paper_slides_url}')
-            self._download_slides(utils.get_absolute_url(paper_url, paper_slides_url), paper_title)
+            if paper_slides_url:
+                logging.info(f'(pid {pid}) downloading slides: {paper_slides_url}')
+                self._download_slides(utils.get_absolute_url(paper_url, paper_slides_url), paper_title)
 
+        # 如果sleep_time_per_paper不为0，下载完成后暂停一段时间
         if self.sleep_time_per_paper:
             time.sleep(self.sleep_time_per_paper)
+
+    def set_pause_stop_callback(self, callback):
+        self.pause_stop_callback = callback
 
     @staticmethod
     def _paper_url_is_file_url(paper_url: str) -> bool:
@@ -119,8 +155,8 @@ class Base(ABC):
         if paper_url.lower().endswith(file_ext_name):
             return True
 
-        paper_url = downloader.get_real_url(paper_url)
-        if paper_url.lower().endswith(file_ext_name):
+        real_url = downloader.get_real_url(paper_url)
+        if real_url and real_url.lower().endswith(file_ext_name):
             return True
 
         return False
@@ -143,32 +179,30 @@ class Base(ABC):
             return None
 
         paper_title_list, paper_url_list = result_tuple
-        num_titles = len(paper_title_list)
-        num_urls = len(paper_url_list)
-        if num_titles != num_urls:
-            logging.error(f'Number of titles ({num_titles}) is not equal to number of urls ({num_urls}).')
+        if len(paper_title_list) != len(paper_url_list):
+            logging.error(f'Number of titles ({len(paper_title_list)}) != number of urls ({len(paper_url_list)}).')
             return None
 
         paper_list = []
-        for paper_no in range(num_titles):
-            paper_title = html_parser.get_text(paper_title_list[paper_no])
+        for title_tag, url_tag in zip(paper_title_list, paper_url_list):
+            paper_title = html_parser.get_text(title_tag)
             if not paper_title:
                 continue
 
-            paper_url = html_parser.get_href(paper_url_list[paper_no])
-            if not paper_url:
+            link = html_parser.get_href(url_tag)
+            if not link:
                 continue
 
-            paper_list.append((paper_title, utils.get_absolute_url(self.url, paper_url)))
+            paper_list.append((paper_title, utils.get_absolute_url(self.url, link)))
         return paper_list
 
     def _get_paper_list_by_dblp(self, html) -> List[Tuple[str, str]] | None:
         paper_list = []
-
-        logging.info(f'parsing html!')
+        logging.info(f'parsing html from dblp!')
         parser = html_parser.get_parser(html)
 
-        if self._get_dblp_venue_type() == DBLPVenueType.CONFERENCE.value:
+        venue_type = self._get_dblp_venue_type()
+        if venue_type == DBLPVenueType.CONFERENCE.value:
             paper_list_selector = '.inproceedings'
         else:
             paper_list_selector = '.article'
@@ -177,14 +211,12 @@ class Base(ABC):
         logging.info(f'number of papers: {len(paper_entry_list)}')
 
         for paper_entry in paper_entry_list:
-            paper_title = paper_entry.select('.title')
-
-            if not paper_title:
+            title_tags = paper_entry.select('.title')
+            if not title_tags:
                 continue
+            paper_title = title_tags[0].text.strip()
 
-            paper_title = paper_title[0].text.strip()
             paper_url = html_parser.get_href_first(paper_entry.select('.drop-down:first-child a'))
-
             paper_list.append((paper_title, paper_url))
 
         return paper_list
@@ -202,18 +234,18 @@ class Base(ABC):
 
     def _get_filename(self, paper_title: str, paper_url: str, name_suffix: str = None) -> str:
         paper_title = re.sub('[/.]+', '', paper_title)
-        paper_title = re.sub('\W+', '-', paper_title)
+        paper_title = re.sub(r'\W+', '-', paper_title)
 
         paper_pathname = os.path.join(self.save_dir, paper_title)
         if name_suffix:
-            paper_pathname += '-' + name_suffix
+            paper_pathname += f'-{name_suffix}'
 
         paper_ext_name = utils.get_file_extension_name_or_default(paper_url, default_value='.pdf')
         return paper_pathname + paper_ext_name
 
     def _download_paper(self, paper_file_url: str, paper_title: str) -> None:
         if not paper_file_url:
-            return None
+            return
 
         paper_filename = self._get_filename(paper_title, paper_file_url, name_suffix='Paper')
         if not os.path.exists(paper_filename):
@@ -221,7 +253,7 @@ class Base(ABC):
 
     def _download_slides(self, paper_slides_url: str, paper_title: str) -> None:
         if not paper_slides_url:
-            return None
+            return
 
         slides_filename = self._get_filename(paper_title, paper_slides_url, name_suffix='Slides')
         if not os.path.exists(slides_filename):
