@@ -68,7 +68,8 @@ _languages = {
         'stop': '停止',
         'pause': '暂停',
         'resume': '恢复',
-        'clear': '清空'
+        'clear': '清空',
+        'export': '导出'
     },
     'en': {
         'window_title': 'APBDOAV',
@@ -109,7 +110,8 @@ _languages = {
         'stop': 'Stop',
         'pause': 'Pause',
         'resume': 'Resume',
-        'clear': 'Clear'
+        'clear': 'Clear',
+        'export': 'Export'
     }
 }
 
@@ -351,13 +353,15 @@ class PaperDownloaderGUI(QMainWindow):
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         log_layout.addWidget(self.log_output)
-
-        h_layout = QHBoxLayout()
-        h_layout.addStretch(1)
+        log_button_layout = QHBoxLayout()
+        log_button_layout.addStretch(1)
+        self.log_export_button = QPushButton(_languages[self.current_language]['export'])
+        self.log_export_button.clicked.connect(self.export_log)
         self.log_clear_button = QPushButton(_languages[self.current_language]['clear'])
         self.log_clear_button.clicked.connect(self.clear_log)
-        h_layout.addWidget(self.log_clear_button)
-        log_layout.addLayout(h_layout)
+        log_button_layout.addWidget(self.log_export_button)
+        log_button_layout.addWidget(self.log_clear_button)
+        log_layout.addLayout(log_button_layout)
         self.log_group.setLayout(log_layout)
 
         main_layout.addWidget(self.log_group)
@@ -407,6 +411,7 @@ class PaperDownloaderGUI(QMainWindow):
         else:
             self.pause_resume_button.setText(_languages[self.current_language]['pause'])
 
+        self.log_export_button.setText(_languages[self.current_language]['export'])
         self.log_clear_button.setText(_languages[self.current_language]['clear'])
 
     def select_save_dir(self):
@@ -544,6 +549,18 @@ class PaperDownloaderGUI(QMainWindow):
     def append_log(self, log):
         self.log_output.append(log)
         self.log_output.ensureCursorVisible()
+
+    @pyqtSlot()
+    def export_log(self):
+        log = self.log_output.toPlainText()
+        if not log:
+            QMessageBox.information(self, 'Info', 'No log to export.')
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(self, 'Select Save File')
+        with open(filename, 'a', encoding='utf-8') as file:
+            file.write(log)
+            file.write('\n')
 
     @pyqtSlot()
     def clear_log(self):
