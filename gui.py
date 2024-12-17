@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import queue
 import sys
 from logging.handlers import QueueListener, QueueHandler
@@ -14,6 +15,7 @@ from PyQt5.QtWidgets import (
 from log_handler import QtLogHandler
 
 language_file = 'i18n/lang.json'
+config_file = 'config.json'
 qss_file = 'gui.qss'
 
 
@@ -126,13 +128,20 @@ class PaperDownloaderGUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        try:
+        if os.path.exists(language_file):
             with open(language_file, 'r', encoding='utf-8') as file:
                 self.languages = json.load(file)
-        except IOError:
+        else:
             self.show_error_message_and_exit(f'Cannot find {language_file}.')
 
-        self.current_language = 'en'  # Initialize default language
+        # Initialize default language
+        self.current_language = 'en'
+        if os.path.exists(config_file):
+            with open(config_file, 'r', encoding='utf-8') as file:
+                config_dict = json.load(file)
+                if config_dict and 'default_language' in config_dict:
+                    self.current_language = config_dict['default_language']
+
         self.thread = None
 
         self.init_ui()
@@ -143,12 +152,13 @@ class PaperDownloaderGUI(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle(self.languages[self.current_language]['window_title'])
-        try:
-            with open(qss_file, 'r', encoding='utf-8') as f:
-                qss = f.read()
-        except IOError:
+        if not os.path.exists(qss_file):
             self.show_error_message_and_exit(f'Cannot find stylesheet {qss_file}.')
-        self.setStyleSheet(qss)
+
+        with open(qss_file, 'r', encoding='utf-8') as f:
+            qss = f.read()
+        if qss:
+            self.setStyleSheet(qss)
 
         # Menu Bar
         menubar = self.menuBar()
@@ -292,6 +302,11 @@ class PaperDownloaderGUI(QMainWindow):
             self.current_language = 'cn'
         else:
             self.current_language = 'en'
+
+        with open(config_file, 'w+', encoding='utf-8') as file:
+            json.dump({
+                'default_language': self.current_language
+            }, file, ensure_ascii=False, indent=4)
 
         self.setWindowTitle(self.languages[self.current_language]['window_title'])
 
