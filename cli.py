@@ -105,5 +105,7 @@ if __name__ == '__main__':
                                 volume=args.volume,
                                 parallel=args.parallel,
                                 proxies=proxies)
-    publisher.process()
+
+    # call empty generator
+    next(publisher.process(use_tqdm=True))
     utils.print_success('Task Done!')

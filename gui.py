@@ -1,26 +1,30 @@
 import json
 import logging
 import os
-import queue
 import sys
-from logging.handlers import QueueListener, QueueHandler
+import time
 
 import venue
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QGridLayout, QGroupBox, QRadioButton,
-    QButtonGroup, QMainWindow, QMenu, QAction, QComboBox
+    QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit,
+    QMessageBox, QGridLayout, QGroupBox, QRadioButton,
+    QButtonGroup, QMainWindow, QMenu, QAction, QComboBox,
+    QProgressBar
 )
-from log_handler import QtLogHandler
 
+##################################################################
+#                             Constant                           #
+##################################################################
 language_file = 'i18n/lang.json'
 config_file = 'config.json'
 qss_file = 'gui.qss'
 
 
-# -------------------------------------------
-# 在GUI中显示日志的Logging Handler
+##################################################################
+#                         Logging Handler                        #
+##################################################################
 class QtLogHandler(logging.Handler):
     def __init__(self, signal):
         super().__init__()
@@ -31,12 +35,14 @@ class QtLogHandler(logging.Handler):
         self.signal.emit(msg)
 
 
-# -------------------------------------------
-# 任务执行的工作线程
+##################################################################
+#                         Worker Thread                          #
+##################################################################
 class DownloaderThread(QThread):
     log_signal = pyqtSignal(str)
     error_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
+    update_progress = pyqtSignal(int)
 
     def __init__(self, publisher: type):
         super().__init__()
@@ -46,10 +52,6 @@ class DownloaderThread(QThread):
         self.stop_flag = False
         self.mutex = QMutex()
         self.pause_condition = QWaitCondition()
-
-        self.log_queue = queue.Queue()
-        self.queue_handler = QueueHandler(self.log_queue)
-        self.listener = None
 
     def pause(self):
         self.mutex.lock()
@@ -86,44 +88,25 @@ class DownloaderThread(QThread):
         self.mutex.unlock()
 
     def run(self):
-        try:
-            logger = logging.getLogger()
-            logger.setLevel(logging.INFO)
+        # 初始化日志
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        qt_log_handler = QtLogHandler(self.log_signal)
+        qt_log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        logger.addHandler(qt_log_handler)
 
-            # 清除现有的 handler
-            for h in logger.handlers[:]:
-                logger.removeHandler(h)
+        # 设置暂停和停止的回调
+        self.publisher.set_pause_stop_callback(self.check_paused_or_stopped)
 
-            # 设置 QueueHandler
-            logger.addHandler(self.queue_handler)
+        for progress in self.publisher.process(use_tqdm=False):
+            self.update_progress.emit(progress)
 
-            # 设置 QueueListener
-            qt_log_handler = QtLogHandler(self.log_signal)
-            qt_log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
-            self.listener = QueueListener(self.log_queue, qt_log_handler)
-            self.listener.start()
-
-            # 设置暂停和停止的回调
-            if hasattr(self.publisher, 'set_pause_stop_callback'):
-                self.publisher.set_pause_stop_callback(self.check_paused_or_stopped)
-            else:
-                self.log_signal.emit(f"Warning: Publisher '{self.publisher.venue_name}' does not support pause/resume.")
-                self.error_signal.emit(f"Publisher '{self.publisher.venue_name}' does not support pause/resume.")
-
-            self.publisher.process()
-
-            self.finished_signal.emit("Download Finished.")
-
-        except Exception as e:
-            self.error_signal.emit(f"Error: {str(e)}")
-        finally:
-            if self.listener:
-                self.listener.stop()
-                self.listener = None
+        self.finished_signal.emit("Download Finished.")
 
 
-# -------------------------------------------
-# GUI类定义
+##################################################################
+#                             GUI                                #
+##################################################################
 class PaperDownloaderGUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -171,7 +154,7 @@ class PaperDownloaderGUI(QMainWindow):
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
 
-        main_layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout()
 
         # Group 1: Basic Settings
         self.basic_settings = QGroupBox(self.languages[self.current_language]['basic_settings'])
@@ -204,7 +187,7 @@ class PaperDownloaderGUI(QMainWindow):
         basic_layout.addWidget(self.keyword_input, 3, 1)
 
         self.basic_settings.setLayout(basic_layout)
-        main_layout.addWidget(self.basic_settings)
+        self.main_layout.addWidget(self.basic_settings)
 
         # Group 2: Additional Parameters
         self.additional_params = QGroupBox(self.languages[self.current_language]['additional_params'])
@@ -221,7 +204,7 @@ class PaperDownloaderGUI(QMainWindow):
         params_layout.addWidget(self.volume_input, 1, 1)
 
         self.additional_params.setLayout(params_layout)
-        main_layout.addWidget(self.additional_params)
+        self.main_layout.addWidget(self.additional_params)
 
         # Group 3: Advanced Settings
         self.advanced_settings = QGroupBox(self.languages[self.current_language]['advanced_settings'])
@@ -257,7 +240,7 @@ class PaperDownloaderGUI(QMainWindow):
         combined_layout.addLayout(combined_label_layout)
         combined_layout.addLayout(combined_input_layout)
         self.advanced_settings.setLayout(combined_layout)
-        main_layout.addWidget(self.advanced_settings)
+        self.main_layout.addWidget(self.advanced_settings)
 
         execution_layout = QGridLayout()
         self.run_button = QPushButton(self.languages[self.current_language]['run'])
@@ -269,7 +252,7 @@ class PaperDownloaderGUI(QMainWindow):
         execution_layout.addWidget(self.run_button, 0, 0)
         execution_layout.addWidget(self.stop_button, 0, 1)
         execution_layout.addWidget(self.pause_resume_button, 0, 2)
-        main_layout.addLayout(execution_layout)
+        self.main_layout.addLayout(execution_layout)
 
         # 初始化按钮状态
         self.run_button.setEnabled(True)
@@ -292,10 +275,19 @@ class PaperDownloaderGUI(QMainWindow):
         log_button_layout.addWidget(self.log_clear_button)
         log_layout.addLayout(log_button_layout)
         self.log_group.setLayout(log_layout)
+        self.main_layout.addWidget(self.log_group)
 
-        main_layout.addWidget(self.log_group)
+        central_widget.setLayout(self.main_layout)
 
-        central_widget.setLayout(main_layout)
+    def start_progress(self):
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.main_layout.insertWidget(self.main_layout.count() - 1, self.progress_bar)
+
+    def update_progress(self, progress):
+        self.progress_bar.setValue(progress)
 
     def update_language(self):
         if self.current_language == 'en':
@@ -412,6 +404,12 @@ class PaperDownloaderGUI(QMainWindow):
             QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['sleep_time_number'])
             return
 
+        # 更新按钮状态
+        self.run_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self.pause_resume_button.setEnabled(True)
+        self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+
         self.log_output.append("Starting download...")
 
         # 设置代理
@@ -432,19 +430,15 @@ class PaperDownloaderGUI(QMainWindow):
             parallel=parallel,
             proxies=proxies
         )
+        self.start_progress()
 
         # 创建线程
         self.thread = DownloaderThread(publisher=publisher_instance)
         self.thread.log_signal.connect(self.append_log)
         self.thread.error_signal.connect(self.show_error)
         self.thread.finished_signal.connect(self.task_finished)
+        self.thread.update_progress.connect(self.update_progress)
         self.thread.start()
-
-        # 更新按钮状态
-        self.run_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        self.pause_resume_button.setEnabled(True)
-        self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
 
     def stop_downloader(self):
         if self.thread and self.thread.isRunning():
@@ -518,6 +512,9 @@ class PaperDownloaderGUI(QMainWindow):
         self.stop_button.setEnabled(False)
         self.pause_resume_button.setEnabled(False)
         self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+
+        self.main_layout.removeWidget(self.progress_bar)
+        self.progress_bar.deleteLater()
 
 
 if __name__ == '__main__':
