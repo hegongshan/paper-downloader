@@ -64,15 +64,13 @@ class Base(ABC):
 
         if not paper_list:
             logging.error('The paper list is empty!')
-            return
-
-        if self.test_mode:
+            yield
+        elif self.test_mode:
             # 测试模式: 随机抽取一篇论文处理
             test_paper = random.sample(paper_list, 1)[0]
             self._process_one(test_paper)
-            return
-
-        if self.parallel:
+            yield
+        elif self.parallel:
             # 并行模式
             with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
                 future_to_paper = {executor.submit(self._process_one, paper): paper for paper in paper_list}

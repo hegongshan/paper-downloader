@@ -36,7 +36,8 @@ class Test(unittest.TestCase):
                                         parallel=False,
                                         proxies=None,
                                         test_mode=True)
-            publisher.process()
+            # call empty generator
+            next(publisher.process(use_tqdm=True))
 
             if idx < len(correct_year_range):
                 self.assertEqual(len(os.listdir(save_dir)), 1)
