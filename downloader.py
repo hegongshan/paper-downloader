@@ -24,7 +24,7 @@ def _get_headers() -> Dict[str, str]:
 
 def download_html(url: str, proxies: Dict[str, str] = None) -> str | None:
     try:
-        if proxies is None:
+        if not proxies:
             r = requests.get(url=url, headers=_get_headers())
         else:
             r = requests.get(url=url, headers=_get_headers(), proxies=proxies)
@@ -37,7 +37,7 @@ def download_html(url: str, proxies: Dict[str, str] = None) -> str | None:
 
 def download_file(url: str, filename: str, proxies: Dict[str, str] = None) -> None:
     try:
-        if proxies is None:
+        if not proxies:
             r = requests.get(url, headers=_get_headers())
         else:
             r = requests.get(url, headers=_get_headers(), proxies=proxies)

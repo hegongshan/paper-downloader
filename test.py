@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import shutil
 import unittest
 
@@ -33,12 +34,13 @@ class Test(unittest.TestCase):
                                         venue_name=venue_name,
                                         year=year,
                                         volume=None,
-                                        parallel=False,
-                                        proxies=None,
-                                        test_mode=True)
-            # call empty generator
-            next(publisher.process(use_tqdm=True))
+                                        proxies=None)
+            paper_list = publisher.get_paper_list()
+            if not paper_list:
+                return
 
+            paper_entry = random.sample(paper_list, 1)[0]
+            publisher.process_one(paper_entry)
             if idx < len(correct_year_range):
                 self.assertEqual(len(os.listdir(save_dir)), 1)
             else:

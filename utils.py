@@ -10,19 +10,6 @@ class _CLIColor(Enum):
     YELLOW = '\033[93m'
 
 
-def get_file_extension_name_or_default(url: str, default_value: str = None) -> str | None:
-    dot_idx = url.rfind('.')
-    if dot_idx == -1:
-        return default_value
-
-    ext_name = url[dot_idx:].lower()
-
-    if re.match(r'^\.[a-zA-Z]+$', ext_name):
-        return ext_name
-
-    return default_value
-
-
 def get_root_url(url: str) -> str:
     protocols = ['https://', 'http://']
     end = 0

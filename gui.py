@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 
 import venue
@@ -15,15 +16,16 @@ from PyQt5.QtWidgets import (
 )
 
 ##################################################################
-#                             Constant                           #
+#                            Constant                            #
 ##################################################################
-language_file = 'i18n/lang.json'
-config_file = 'config.json'
-qss_file = 'gui.qss'
+LANGUAGE_FILE = 'i18n/lang.json'
+CONFIG_FILE = 'config.json'
+QSS_FILE = 'gui.qss'
+DEFAULT_SLEEP_TIME = 2
 
 
 ##################################################################
-#                         Logging Handler                        #
+#                        Logging Handler                         #
 ##################################################################
 class QtLogHandler(logging.Handler):
     def __init__(self, signal):
@@ -39,109 +41,103 @@ class QtLogHandler(logging.Handler):
 #                         Worker Thread                          #
 ##################################################################
 class DownloaderThread(QThread):
-    log_signal = pyqtSignal(str)
-    error_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal(str)
-    update_progress = pyqtSignal(int)
+    progress_signal = pyqtSignal()
+    finished_signal = pyqtSignal()
 
-    def __init__(self, publisher: type):
+    def __init__(self,
+                 publisher: type,
+                 paper_entry_list):
         super().__init__()
         self.publisher = publisher
+        self.paper_entry_list = paper_entry_list
 
         self.paused = False
-        self.stop_flag = False
-        self.mutex = QMutex()
-        self.pause_condition = QWaitCondition()
+        self.stopped = False
+        self.thread_id = None
 
     def pause(self):
-        self.mutex.lock()
+        if self.isFinished():
+            return
+
         self.paused = True
-        self.mutex.unlock()
-        self.log_signal.emit("Download paused.")
+        logging.info(f'Thread {self.thread_id} is pausing...')
 
     def resume(self):
-        self.mutex.lock()
+        if self.isFinished():
+            return
+
         self.paused = False
-        self.pause_condition.wakeAll()
-        self.mutex.unlock()
-        self.log_signal.emit("Download resumed.")
+        logging.info(f'Thread {self.thread_id} is resuming...')
 
     def stop(self):
-        self.mutex.lock()
-        self.stop_flag = True
+        if self.isFinished():
+            return
+
+        self.stopped = True
         if self.paused:
             self.paused = False
-            self.pause_condition.wakeAll()
-        self.mutex.unlock()
-        self.log_signal.emit("Download stopping...")
-
-    def check_paused_or_stopped(self):
-        self.mutex.lock()
-        if self.stop_flag:
-            self.mutex.unlock()
-            raise Exception("Download stopped by user.")
-        while self.paused:
-            self.pause_condition.wait(self.mutex)
-            if self.stop_flag:
-                self.mutex.unlock()
-                raise Exception("Download stopped by user.")
-        self.mutex.unlock()
+        logging.info(f'Thread {self.thread_id} is stopping...')
 
     def run(self):
-        # 初始化日志
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
-        qt_log_handler = QtLogHandler(self.log_signal)
-        qt_log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
-        logger.addHandler(qt_log_handler)
+        self.thread_id = threading.get_native_id()
 
-        # 设置暂停和停止的回调
-        self.publisher.set_pause_stop_callback(self.check_paused_or_stopped)
+        for paper_entry in self.paper_entry_list:
+            if self.stopped:
+                break
+            while self.paused:
+                pass
+            if self.stopped:
+                break
+            self.publisher.process_one(paper_entry)
+            self.progress_signal.emit()
 
-        for progress in self.publisher.process(use_tqdm=False):
-            self.update_progress.emit(progress)
-
-        self.finished_signal.emit("Download Finished.")
+        logging.info(f'Thread {self.thread_id} Finished.')
+        self.finished_signal.emit()
 
 
 ##################################################################
-#                             GUI                                #
+#                              GUI                               #
 ##################################################################
 class PaperDownloaderGUI(QMainWindow):
+    log_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
 
-        if os.path.exists(language_file):
-            with open(language_file, 'r', encoding='utf-8') as file:
+        self.threads = []
+        self.finished_threads = 0
+        self.num_threads = 0
+        self.task_complete_count = 0
+        self.num_tasks = 0
+        self.mutex = QMutex()
+
+        self.init_language()
+        self.init_ui()
+        self.init_style()
+        self.init_logging()
+
+    def show_error_message(self, message, need_to_exit=False):
+        QMessageBox.critical(self, 'Error', f'Error: \n{message}')
+        if need_to_exit:
+            sys.exit()
+
+    def init_language(self):
+        if os.path.exists(LANGUAGE_FILE):
+            with open(LANGUAGE_FILE, 'r', encoding='utf-8') as file:
                 self.languages = json.load(file)
         else:
-            self.show_error_message_and_exit(f'Cannot find {language_file}.')
+            self.show_error_message(f'Cannot find {LANGUAGE_FILE}.', need_to_exit=True)
 
         # Initialize default language
         self.current_language = 'en'
-        if os.path.exists(config_file):
-            with open(config_file, 'r', encoding='utf-8') as file:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as file:
                 config_dict = json.load(file)
                 if config_dict and 'default_language' in config_dict:
                     self.current_language = config_dict['default_language']
 
-        self.thread = None
-
-        self.init_ui()
-
-    def show_error_message_and_exit(self, message):
-        QMessageBox.critical(self, 'Error', f'Error: \n{message}')
-        sys.exit()
-
     def init_ui(self):
         self.setWindowTitle(self.languages[self.current_language]['window_title'])
-        if not os.path.exists(qss_file):
-            self.show_error_message_and_exit(f'Cannot find stylesheet {qss_file}.')
-
-        with open(qss_file, 'r', encoding='utf-8') as f:
-            qss = f.read()
-        if qss:
-            self.setStyleSheet(qss)
 
         # Menu Bar
         menubar = self.menuBar()
@@ -177,7 +173,7 @@ class PaperDownloaderGUI(QMainWindow):
 
         self.sleep_time_label = QLabel(self.languages[self.current_language]['sleep_time_label'])
         basic_layout.addWidget(self.sleep_time_label, 2, 0)
-        self.sleep_time_input = QLineEdit('2')
+        self.sleep_time_input = QLineEdit(str(DEFAULT_SLEEP_TIME))
         basic_layout.addWidget(self.sleep_time_input, 2, 1)
 
         self.keyword_label = QLabel(self.languages[self.current_language]['keyword'])
@@ -242,22 +238,33 @@ class PaperDownloaderGUI(QMainWindow):
         self.advanced_settings.setLayout(combined_layout)
         self.main_layout.addWidget(self.advanced_settings)
 
-        execution_layout = QGridLayout()
+        execution_layout = QHBoxLayout()
         self.run_button = QPushButton(self.languages[self.current_language]['run'])
         self.run_button.clicked.connect(self.run_downloader)
         self.stop_button = QPushButton(self.languages[self.current_language]['stop'])
         self.stop_button.clicked.connect(self.stop_downloader)
-        self.pause_resume_button = QPushButton(self.languages[self.current_language]['pause'])
-        self.pause_resume_button.clicked.connect(self.toggle_pause_resume)
-        execution_layout.addWidget(self.run_button, 0, 0)
-        execution_layout.addWidget(self.stop_button, 0, 1)
-        execution_layout.addWidget(self.pause_resume_button, 0, 2)
+        self.pause_button = QPushButton(self.languages[self.current_language]['pause'])
+        self.pause_button.clicked.connect(self.pause_downloader)
+        self.resume_button = QPushButton(self.languages[self.current_language]['resume'])
+        self.resume_button.clicked.connect(self.resume_downloader)
+
+        execution_layout.addWidget(self.run_button)
+        execution_layout.addWidget(self.stop_button)
+        execution_layout.addWidget(self.pause_button)
+        execution_layout.addWidget(self.resume_button)
         self.main_layout.addLayout(execution_layout)
 
         # 初始化按钮状态
         self.run_button.setEnabled(True)
         self.stop_button.setEnabled(False)
-        self.pause_resume_button.setEnabled(False)
+        self.pause_button.setEnabled(False)
+        self.resume_button.setEnabled(False)
+
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.progress_bar.hide()
+        self.main_layout.addWidget(self.progress_bar)
 
         # Logs Section
         self.log_group = QGroupBox(self.languages[self.current_language]['log'])
@@ -279,15 +286,47 @@ class PaperDownloaderGUI(QMainWindow):
 
         central_widget.setLayout(self.main_layout)
 
-    def start_progress(self):
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setAlignment(Qt.AlignCenter)
-        self.main_layout.insertWidget(self.main_layout.count() - 1, self.progress_bar)
+    def init_style(self):
+        if not os.path.exists(QSS_FILE):
+            self.show_error_message(f'Cannot find stylesheet {QSS_FILE}.', need_to_exit=True)
 
-    def update_progress(self, progress):
-        self.progress_bar.setValue(progress)
+        with open(QSS_FILE, 'r', encoding='utf-8') as f:
+            qss = f.read()
+        if qss:
+            self.setStyleSheet(qss)
+
+    def init_logging(self):
+        self.log_signal.connect(self.append_log)
+        log_handler = QtLogHandler(self.log_signal)
+        log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        log_handler.setLevel(logging.INFO)
+
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+        logger.addHandler(log_handler)
+
+    def start_progress(self):
+        self.mutex.lock()
+        self.progress_bar.setValue(0)
+        self.mutex.unlock()
+
+        self.progress_bar.show()
+
+    def update_progress(self):
+        self.mutex.lock()
+        self.task_complete_count += 1
+        progress_value = int(round(self.task_complete_count / self.num_tasks, 2) * 100)
+        self.progress_bar.setValue(progress_value)
+        self.mutex.unlock()
+
+    def reset_progress(self):
+        self.threads.clear()
+        self.finished_threads = 0
+        self.num_tasks = 0
+        self.task_complete_count = 0
+        self.progress_bar.hide()
 
     def update_language(self):
         if self.current_language == 'en':
@@ -295,7 +334,7 @@ class PaperDownloaderGUI(QMainWindow):
         else:
             self.current_language = 'en'
 
-        with open(config_file, 'w+', encoding='utf-8') as file:
+        with open(CONFIG_FILE, 'w+', encoding='utf-8') as file:
             json.dump({
                 'default_language': self.current_language
             }, file, ensure_ascii=False, indent=4)
@@ -326,10 +365,8 @@ class PaperDownloaderGUI(QMainWindow):
 
         self.run_button.setText(self.languages[self.current_language]['run'])
         self.stop_button.setText(self.languages[self.current_language]['stop'])
-        if self.thread and self.thread.paused:
-            self.pause_resume_button.setText(self.languages[self.current_language]['resume'])
-        else:
-            self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+        self.pause_button.setText(self.languages[self.current_language]['pause'])
+        self.resume_button.setText(self.languages[self.current_language]['resume'])
 
         self.log_group.setTitle(self.languages[self.current_language]['log'])
         self.log_export_button.setText(self.languages[self.current_language]['export'])
@@ -341,6 +378,7 @@ class PaperDownloaderGUI(QMainWindow):
             self.save_dir_input.setText(directory)
 
     def run_downloader(self):
+        logging.info('Input Checking...')
         venue_name = self.venue_input.currentText().strip()
         save_dir = self.save_dir_input.text().strip()
         sleep_time_per_paper = self.sleep_time_input.text().strip()
@@ -350,8 +388,6 @@ class PaperDownloaderGUI(QMainWindow):
         http_proxy = self.http_proxy_input.text().strip()
         https_proxy = self.https_proxy_input.text().strip()
         parallel = self.btn_group.checkedButton().text() == self.languages[self.current_language]['enable']
-
-        self.log_output.clear()
 
         if not venue_name:
             QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['venue_required'])
@@ -381,7 +417,7 @@ class PaperDownloaderGUI(QMainWindow):
                 return
 
             if volume:
-                self.log_output.append(
+                logging.warning(
                     f'Warning: The conference "{venue_name}" does not require the volume field, but it is currently set to "{volume}".')
         elif venue.is_journal(venue_publisher):
             if not volume:
@@ -395,22 +431,23 @@ class PaperDownloaderGUI(QMainWindow):
                 return
 
             if year:
-                self.log_output.append(
+                logging.warning(
                     f'Warning: The journal "{venue_name}" does not require the year field, but it is currently set to "{year}".')
 
         try:
-            sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else 2
+            sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else DEFAULT_SLEEP_TIME
         except ValueError:
             QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['sleep_time_number'])
             return
 
+        logging.info('Check complete!')
+
         # 更新按钮状态
         self.run_button.setEnabled(False)
         self.stop_button.setEnabled(True)
-        self.pause_resume_button.setEnabled(True)
-        self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
-
-        self.log_output.append("Starting download...")
+        self.pause_button.setEnabled(True)
+        self.resume_button.setEnabled(False)
+        logging.info('Starting download...')
 
         # 设置代理
         proxies = {}
@@ -427,21 +464,38 @@ class PaperDownloaderGUI(QMainWindow):
             venue_name=venue_name_lower,
             year=year,
             volume=volume,
-            parallel=parallel,
             proxies=proxies
         )
-        self.start_progress()
+
+        try:
+            paper_list = publisher_instance.get_paper_list()
+            if not paper_list:
+                logging.warning('The paper list is empty!')
+                return
+        except Exception as e:
+            self.show_error_message(e, need_to_exit=False)
+            return
+
+        self.num_tasks = len(paper_list)
 
         # 创建线程
-        self.thread = DownloaderThread(publisher=publisher_instance)
-        self.thread.log_signal.connect(self.append_log)
-        self.thread.error_signal.connect(self.show_error)
-        self.thread.finished_signal.connect(self.task_finished)
-        self.thread.update_progress.connect(self.update_progress)
-        self.thread.start()
+        self.num_threads = os.cpu_count() if parallel else 1
+        task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
+        for i in range(self.num_threads):
+            thread = DownloaderThread(publisher=publisher_instance,
+                                      paper_entry_list=paper_list[
+                                                       i * task_per_thread: (i + 1) * task_per_thread])
+            thread.finished_signal.connect(self.task_finished)
+            thread.progress_signal.connect(self.update_progress)
+            self.threads.append(thread)
+
+        # 启动线程
+        self.start_progress()
+        for thread in self.threads:
+            thread.start()
 
     def stop_downloader(self):
-        if self.thread and self.thread.isRunning():
+        if self.threads:
             confirm = QMessageBox.question(
                 self,
                 self.languages[self.current_language]['stop_confirm_title'],
@@ -450,27 +504,27 @@ class PaperDownloaderGUI(QMainWindow):
                 QMessageBox.No
             )
             if confirm == QMessageBox.Yes:
-                self.thread.stop()
-                self.thread.wait()  # 等待线程结束
-                self.log_output.append("Download stopped.")
-                self.run_button.setEnabled(True)
-                self.stop_button.setEnabled(False)
-                self.pause_resume_button.setEnabled(False)
-                self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+                for thread in self.threads:
+                    thread.stop()
+                    thread.wait()
         else:
             QMessageBox.information(self, 'Info', self.languages[self.current_language]['no_active_to_stop'])
 
-    def toggle_pause_resume(self):
-        if not self.thread:
-            return
-        if self.thread.paused:
-            # 恢复下载
-            self.thread.resume()
-            self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
-        else:
-            # 暂停下载
-            self.thread.pause()
-            self.pause_resume_button.setText(self.languages[self.current_language]['resume'])
+    def pause_downloader(self):
+        for thread in self.threads:
+            thread.pause()
+        self.run_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self.pause_button.setEnabled(False)
+        self.resume_button.setEnabled(True)
+
+    def resume_downloader(self):
+        for thread in self.threads:
+            thread.resume()
+        self.run_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self.pause_button.setEnabled(True)
+        self.resume_button.setEnabled(False)
 
     @pyqtSlot(str)
     def append_log(self, log):
@@ -493,28 +547,20 @@ class PaperDownloaderGUI(QMainWindow):
     def clear_log(self):
         self.log_output.clear()
 
-    @pyqtSlot(str)
-    def show_error(self, error):
-        QMessageBox.critical(self, 'Error', error)
-        self.log_output.append(f"[Error] {error}")
-        # 判断是否与暂停/恢复相关
-        if "does not support pause/resume" in error:
-            self.pause_resume_button.setEnabled(False)
-        self.run_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-        self.pause_resume_button.setEnabled(False)
-        self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+    @pyqtSlot()
+    def task_finished(self):
+        self.mutex.lock()
+        self.finished_threads += 1
+        self.mutex.unlock()
 
-    @pyqtSlot(str)
-    def task_finished(self, msg):
-        self.log_output.append(msg)
-        self.run_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-        self.pause_resume_button.setEnabled(False)
-        self.pause_resume_button.setText(self.languages[self.current_language]['pause'])
+        if self.finished_threads == self.num_threads:
+            self.run_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            self.pause_button.setEnabled(False)
+            self.resume_button.setEnabled(False)
 
-        self.main_layout.removeWidget(self.progress_bar)
-        self.progress_bar.deleteLater()
+            self.reset_progress()
+            logging.info('Download Finished!')
 
 
 if __name__ == '__main__':

@@ -1,9 +1,11 @@
 import argparse
+import concurrent.futures
 import logging
 import os
 
 import utils
 import venue
+from tqdm import tqdm
 
 default_log_file = 'paper-downloader.log'
 
@@ -103,9 +105,18 @@ if __name__ == '__main__':
                                 venue_name=venue_name,
                                 year=args.year,
                                 volume=args.volume,
-                                parallel=args.parallel,
                                 proxies=proxies)
+    paper_list = publisher.get_paper_list()
 
-    # call empty generator
-    next(publisher.process(use_tqdm=True))
+    if args.parallel:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            futures = [executor.submit(publisher.process_one, paper_entry) for paper_entry in paper_list]
+            with tqdm(total=len(paper_list)) as progress_bar:
+                for future in concurrent.futures.as_completed(futures):
+                    if future.done():
+                        progress_bar.update(1)
+    else:
+        for paper_entry in tqdm(paper_list):
+            publisher.process_one(paper_entry)
+
     utils.print_success('Task Done!')

@@ -63,7 +63,7 @@
     "keyword_placeholder": "Support regular expressions.",
     "additional_params": "Additional Settings",
     "year_label": "Year (Conference Only):",
-    "volume_label": "Volume (Journal only):",
+    "volume_label": "Volume (Journal Only):",
     "year_required": "\"Year\" is a required field.'",
     "year_integer": "\"Year\" must be an integer.",
     "volume_required": "\"Volume\" is a required field.'",

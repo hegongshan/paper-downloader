@@ -1,8 +1,5 @@
-import asyncio
-import concurrent.futures
 import logging
 import os
-import random
 import re
 import threading
 import time
@@ -14,7 +11,6 @@ from typing import Dict, List, Tuple, Generator
 import downloader
 import html_parser
 import utils
-from tqdm import tqdm
 
 _Tag = html_parser.Tag
 
@@ -32,7 +28,6 @@ class Base(ABC):
                  save_dir: str,
                  sleep_time_per_paper: float,
                  keyword: str = None,
-                 parallel: bool = False,
                  proxies: Dict[str, str] = None,
                  **kwargs):
         self.save_dir = save_dir
@@ -40,7 +35,6 @@ class Base(ABC):
             os.makedirs(self.save_dir)
         self.sleep_time_per_paper = sleep_time_per_paper
         self.keyword = keyword
-        self.parallel = parallel
         self.proxies = proxies
 
         if 'venue_name' in kwargs:
@@ -48,58 +42,10 @@ class Base(ABC):
         else:
             self.venue_name = None
 
-        if 'test_mode' in kwargs:
-            self.test_mode = kwargs['test_mode']
-        else:
-            self.test_mode = False
-
-        # 回调函数，用于在处理前检查暂停/停止状态
-        self.pause_stop_callback = None
-
         self.url = self._get_url()
         self.dblp_url_prefix = 'https://dblp.org/db/'
 
-    def process(self, use_tqdm=True) -> Generator[int, None, None]:
-        paper_list = self._get_paper_list()
-
-        if not paper_list:
-            logging.error('The paper list is empty!')
-            yield
-        elif self.test_mode:
-            # 测试模式: 随机抽取一篇论文处理
-            test_paper = random.sample(paper_list, 1)[0]
-            self._process_one(test_paper)
-            yield
-        elif self.parallel:
-            # 并行模式
-            with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-                future_to_paper = {executor.submit(self._process_one, paper): paper for paper in paper_list}
-
-                if use_tqdm:
-                    with tqdm(total=len(paper_list)) as progress_bar:
-                        for future in concurrent.futures.as_completed(future_to_paper):
-                            if future.done():
-                                progress_bar.update(1)
-                    yield
-                else:
-                    for idx, future in enumerate(concurrent.futures.as_completed(future_to_paper)):
-                        if future.done():
-                            yield self._get_progress(idx, len(paper_list))
-        else:
-            # 串行模式
-            if use_tqdm:
-                for paper_entry in tqdm(paper_list):
-                    self._process_one(paper_entry)
-                yield
-            else:
-                for idx, (paper_entry) in enumerate(paper_list):
-                    self._process_one(paper_entry)
-                    yield self._get_progress(idx, len(paper_list))
-
-    def _process_one(self, paper_info: Tuple[str, str]) -> None:
-        if self.pause_stop_callback:
-            self.pause_stop_callback()
-
+    def process_one(self, paper_info: Tuple[str, str]) -> None:
         paper_title, paper_url = paper_info
         tid = threading.get_native_id()
 
@@ -137,13 +83,6 @@ class Base(ABC):
         if self.sleep_time_per_paper:
             time.sleep(self.sleep_time_per_paper)
 
-    def set_pause_stop_callback(self, callback):
-        self.pause_stop_callback = callback
-
-    @staticmethod
-    def _get_progress(index, total):
-        return int(round((index + 1) / total, 2) * 100)
-
     @staticmethod
     def _paper_url_is_file_url(paper_url: str) -> bool:
         file_ext_name = '.pdf'
@@ -156,7 +95,7 @@ class Base(ABC):
 
         return False
 
-    def _get_paper_list(self) -> List[Tuple[str, str]] | None:
+    def get_paper_list(self) -> List[Tuple[str, str]] | None:
         if not self.url:
             logging.error('URL is empty!')
             return None
@@ -210,26 +149,25 @@ class Base(ABC):
         logging.info(f'number of papers: {len(paper_entry_list)}')
 
         for paper_entry in paper_entry_list:
-            title_tags = paper_entry.select('.title')
-            if not title_tags:
+            paper_title = html_parser.get_text_first(paper_entry.select('.title'))
+            if not paper_title:
                 continue
-            paper_title = title_tags[0].text.strip()
 
             paper_url = html_parser.get_href_first(paper_entry.select('.drop-down:first-child a'))
             paper_list.append((paper_title, paper_url))
-
         return paper_list
 
     def _get_dblp_venue_type(self) -> str | None:
-        start = self.url.find(self.dblp_url_prefix)
-        if start == -1:
+        start = len(self.dblp_url_prefix)
+
+        remaining = self.url[start:]
+        if not remaining:
             return None
 
-        start += len(self.dblp_url_prefix)
-        end = self.url[start:].find('/')
-        if end == -1:
+        slash_idx = remaining.find('/')
+        if slash_idx == -1:
             return None
-        return self.url[start: start + end]
+        return self.url[start: start + slash_idx]
 
     def _get_filename(self, paper_title: str, paper_url: str, name_suffix: str = None) -> str:
         paper_title = re.sub('[/.]+', '', paper_title)
@@ -239,7 +177,9 @@ class Base(ABC):
         if name_suffix:
             paper_pathname += f'-{name_suffix}'
 
-        paper_ext_name = utils.get_file_extension_name_or_default(paper_url, default_value='.pdf')
+        _, paper_ext_name = os.path.splitext(paper_url)
+        if not paper_ext_name:
+            paper_ext_name = '.pdf'
         return paper_pathname + paper_ext_name
 
     def _download_paper(self, paper_file_url: str, paper_title: str) -> None:
