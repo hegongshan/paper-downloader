@@ -3,7 +3,7 @@ import os
 import re
 import threading
 import time
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import OrderedDict
 from enum import Enum
 from typing import Dict, List, Tuple, Generator
@@ -26,7 +26,7 @@ class DBLPVenueType(Enum):
 class Base(ABC):
     def __init__(self,
                  save_dir: str,
-                 sleep_time_per_paper: float,
+                 sleep_time_per_paper: float = 2,
                  keyword: str = None,
                  proxies: Dict[str, str] = None,
                  **kwargs):
@@ -36,14 +36,23 @@ class Base(ABC):
         self.sleep_time_per_paper = sleep_time_per_paper
         self.keyword = keyword
         self.proxies = proxies
-
-        if 'venue_name' in kwargs:
-            self.venue_name = kwargs['venue_name']
-        else:
-            self.venue_name = None
-
         self.url = self._get_url()
         self.dblp_url_prefix = 'https://dblp.org/db/'
+
+    def get_paper_list(self) -> List[Tuple[str, str]]:
+        if not self.url:
+            logging.error('URL is empty!')
+            return []
+
+        logging.info(f'downloading {self.url}')
+        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
+        if not paper_list_html or not paper_list_html.strip():
+            return []
+
+        if self.url.startswith(self.dblp_url_prefix):
+            return self._get_paper_list_by_dblp(paper_list_html)
+
+        return self._get_paper_list_by_diy(paper_list_html)
 
     def process_one(self, paper_info: Tuple[str, str]) -> None:
         paper_title, paper_url = paper_info
@@ -95,46 +104,7 @@ class Base(ABC):
 
         return False
 
-    def get_paper_list(self) -> List[Tuple[str, str]] | None:
-        if not self.url:
-            logging.error('URL is empty!')
-            return None
-
-        logging.info(f'downloading {self.url}')
-        paper_list_html = downloader.download_html(self.url, proxies=self.proxies)
-        if not paper_list_html or not paper_list_html.strip():
-            return None
-
-        if self.url.startswith(self.dblp_url_prefix):
-            return self._get_paper_list_by_dblp(paper_list_html)
-
-        return self._get_paper_list_by_diy(paper_list_html)
-
-    def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]] | None:
-        result_tuple = self._get_paper_title_and_url_list_by_diy(html)
-        if not result_tuple:
-            logging.error(f'Unable to extract title and URL from the given URL ({self.url}).')
-            return None
-
-        paper_title_list, paper_url_list = result_tuple
-        if len(paper_title_list) != len(paper_url_list):
-            logging.error(f'Number of titles ({len(paper_title_list)}) != number of urls ({len(paper_url_list)}).')
-            return None
-
-        paper_list = []
-        for title_tag, url_tag in zip(paper_title_list, paper_url_list):
-            paper_title = html_parser.get_text(title_tag)
-            if not paper_title:
-                continue
-
-            link = html_parser.get_href(url_tag)
-            if not link:
-                continue
-
-            paper_list.append((paper_title, utils.get_absolute_url(self.url, link)))
-        return paper_list
-
-    def _get_paper_list_by_dblp(self, html) -> List[Tuple[str, str]] | None:
+    def _get_paper_list_by_dblp(self, html) -> List[Tuple[str, str]]:
         paper_list = []
         logging.info(f'parsing html from dblp!')
         parser = html_parser.get_parser(html)
@@ -160,6 +130,7 @@ class Base(ABC):
     def _get_dblp_venue_type(self) -> str | None:
         start = len(self.dblp_url_prefix)
 
+        # The url has been checked in get_paper_list().
         remaining = self.url[start:]
         if not remaining:
             return None
@@ -168,6 +139,30 @@ class Base(ABC):
         if slash_idx == -1:
             return None
         return self.url[start: start + slash_idx]
+
+    def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]]:
+        result_tuple = self._get_paper_title_and_url_list_by_diy(html)
+        if not result_tuple:
+            logging.error(f'Unable to extract title and URL from the given URL ({self.url}).')
+            return []
+
+        paper_title_list, paper_url_list = result_tuple
+        if len(paper_title_list) != len(paper_url_list):
+            logging.error(f'Number of titles ({len(paper_title_list)}) != number of urls ({len(paper_url_list)}).')
+            return []
+
+        paper_list = []
+        for title_tag, url_tag in zip(paper_title_list, paper_url_list):
+            paper_title = html_parser.get_text(title_tag)
+            if not paper_title:
+                continue
+
+            link = html_parser.get_href(url_tag)
+            if not link:
+                continue
+
+            paper_list.append((paper_title, utils.get_absolute_url(self.url, link)))
+        return paper_list
 
     def _get_filename(self, paper_title: str, paper_url: str, name_suffix: str = None) -> str:
         paper_title = re.sub('[/.]+', '', paper_title)
@@ -215,66 +210,39 @@ class Base(ABC):
         pass
 
 
-class Conference(Base):
-
-    def __init__(self, save_dir: str, sleep_time_per_paper: float, **kwargs):
-        if 'year' in kwargs:
-            self.year = kwargs['year']
-        else:
-            self.year = None
-
-        super().__init__(save_dir, sleep_time_per_paper, **kwargs)
-
-    @abstractmethod
-    def _get_url(self) -> str | None:
-        pass
-
-    @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
-        pass
-
-    @abstractmethod
-    def _get_paper_file_url(self, html: str) -> str:
-        pass
-
-    @abstractmethod
-    def _get_slides_file_url(self, html: str) -> str:
-        pass
+class Conference(Base, metaclass=ABCMeta):
+    def __init__(self,
+                 year: int,
+                 save_dir: str,
+                 **kwargs):
+        self.year = year
+        super().__init__(save_dir, **kwargs)
 
 
-class Journal(Base):
+class Journal(Base, metaclass=ABCMeta):
+    def __init__(self,
+                 volume: int,
+                 save_dir: str,
+                 **kwargs):
+        self.volume = volume
+        super().__init__(save_dir, **kwargs)
 
-    def __init__(self, save_dir: str, sleep_time_per_paper: float, **kwargs):
-        if 'volume' in kwargs:
-            self.volume = kwargs['volume']
-        else:
-            self.volume = None
 
-        super().__init__(save_dir, sleep_time_per_paper, **kwargs)
-
-    @abstractmethod
-    def _get_url(self) -> str | None:
-        pass
-
-    @abstractmethod
-    def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
-        pass
-
-    @abstractmethod
-    def _get_paper_file_url(self, html: str) -> str:
-        pass
-
-    @abstractmethod
-    def _get_slides_file_url(self, html: str) -> str:
-        pass
+class MultiConference(Conference, metaclass=ABCMeta):
+    def __init__(self,
+                 venue_name: str,
+                 year: int,
+                 save_dir: str,
+                 **kwargs):
+        self.venue_name = venue_name
+        super().__init__(year, save_dir, **kwargs)
 
 
 ##################################################################
 #                           Conference                           #
 ##################################################################
 
-class USENIX(Conference):
-
+class USENIX(MultiConference):
     def _get_url(self) -> str | None:
         if self.venue_name == 'atc':
             self.venue_name = 'usenix'
@@ -343,7 +311,7 @@ class IJCAI(Conference):
         pass
 
 
-class CVF(Conference):
+class CVF(MultiConference):
     def _get_url(self) -> str | None:
         available_confs = ['CVPR', 'ICCV']
         venue_name = self.venue_name.upper()
@@ -471,8 +439,7 @@ class NeurIPS(Conference):
         pass
 
 
-class ACL(Conference):
-
+class ACL(MultiConference):
     def _get_url(self) -> str | None:
         available_confs = ['acl', 'emnlp', 'naacl']
 

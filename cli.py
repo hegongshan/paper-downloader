@@ -90,7 +90,7 @@ if __name__ == '__main__':
         if args.volume:
             utils.print_warning(
                 f'The conference "{venue_name}" does not require the volume field, but it is currently set to "{args.volume}".')
-    elif venue.is_journal(venue_publisher):
+    else:
         if not args.volume:
             utils.print_and_exit(f'Volume is a required field.')
         if args.year:
@@ -107,16 +107,18 @@ if __name__ == '__main__':
                                 volume=args.volume,
                                 proxies=proxies)
     paper_list = publisher.get_paper_list()
-
-    if args.parallel:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            futures = [executor.submit(publisher.process_one, paper_entry) for paper_entry in paper_list]
-            with tqdm(total=len(paper_list)) as progress_bar:
-                for future in concurrent.futures.as_completed(futures):
-                    if future.done():
-                        progress_bar.update(1)
+    if not paper_list:
+        utils.print_warning('The paper list is empty!')
     else:
-        for paper_entry in tqdm(paper_list):
-            publisher.process_one(paper_entry)
+        if args.parallel:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+                futures = [executor.submit(publisher.process_one, paper_entry) for paper_entry in paper_list]
+                with tqdm(total=len(paper_list)) as progress_bar:
+                    for future in concurrent.futures.as_completed(futures):
+                        if future.done():
+                            progress_bar.update(1)
+        else:
+            for paper_entry in tqdm(paper_list):
+                publisher.process_one(paper_entry)
 
     utils.print_success('Task Done!')

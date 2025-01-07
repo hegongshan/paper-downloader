@@ -467,13 +467,9 @@ class PaperDownloaderGUI(QMainWindow):
             proxies=proxies
         )
 
-        try:
-            paper_list = publisher_instance.get_paper_list()
-            if not paper_list:
-                logging.warning('The paper list is empty!')
-                return
-        except Exception as e:
-            self.show_error_message(e, need_to_exit=False)
+        paper_list = publisher_instance.get_paper_list()
+        if not paper_list:
+            logging.warning('The paper list is empty!')
             return
 
         self.num_tasks = len(paper_list)
