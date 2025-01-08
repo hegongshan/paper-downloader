@@ -3,11 +3,11 @@ import concurrent.futures
 import logging
 import os
 
-import utils
-import venue
+import core.utils as utils
+import core.venue as venue
 from tqdm import tqdm
 
-default_log_file = 'paper-downloader.log'
+DEFAULT_LOG_FILE = 'paper-downloader.log'
 
 
 def parse_args():
@@ -20,12 +20,12 @@ def parse_args():
                       help=f'Available value = {venue.get_available_venues()}.')
     args.add_argument('--save-dir',
                       type=str,
-                      default='./paper',
-                      help='Set a directory to store these papers. (default value: "./paper")')
+                      default='paper',
+                      help='Set a directory to store these papers. (default value: "paper")')
     args.add_argument('--log-file',
                       type=str,
-                      default=default_log_file,
-                      help=f'The filename of the log. (default value: "{default_log_file}")')
+                      default=DEFAULT_LOG_FILE,
+                      help=f'The filename of the log. (default value: "{DEFAULT_LOG_FILE}")')
     args.add_argument('--sleep-time-per-paper',
                       type=float,
                       default=2,
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     args = parse_args()
 
     # config logging
-    log_file = args.log_file if args.log_file else default_log_file
+    log_file = args.log_file if args.log_file else DEFAULT_LOG_FILE
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)

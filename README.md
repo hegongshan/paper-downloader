@@ -20,7 +20,7 @@ options:
   -h, --help            show this help message and exit
   --venue VENUE         Available value = fast,osdi,atc,nsdi,uss,ndss,aaai,ijcai,cvpr,iccv,eccv,iclr,icml,neu
                         rips,nips,acl,emnlp,naacl,rss,pvldb,jmlr.
-  --save-dir SAVE_DIR   Set a directory to store these papers. (default value: "./paper")
+  --save-dir SAVE_DIR   Set a directory to store these papers. (default value: "paper")
   --log-file LOG_FILE   The filename of the log. (default value: "paper-downloader.log")
   --sleep-time-per-paper SLEEP_TIME_PER_PAPER
                         The time interval between downloads, measured in seconds. (default value: 2)

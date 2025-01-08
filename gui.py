@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 
-import venue
+import core.venue as venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
@@ -18,9 +18,9 @@ from PyQt5.QtWidgets import (
 ##################################################################
 #                            Constant                            #
 ##################################################################
-LANGUAGE_FILE = 'i18n/lang.json'
-CONFIG_FILE = 'config.json'
-QSS_FILE = 'gui.qss'
+LANGUAGE_FILE = os.path.join('config', 'i18n', 'lang.json')
+CONFIG_FILE = os.path.join('config', 'config.json')
+QSS_FILE = os.path.join('config', 'gui.qss')
 DEFAULT_SLEEP_TIME = 2
 
 
@@ -419,7 +419,7 @@ class PaperDownloaderGUI(QMainWindow):
             if volume:
                 logging.warning(
                     f'Warning: The conference "{venue_name}" does not require the volume field, but it is currently set to "{volume}".')
-        elif venue.is_journal(venue_publisher):
+        else:
             if not volume:
                 QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['volume_required'])
                 return
@@ -481,7 +481,7 @@ class PaperDownloaderGUI(QMainWindow):
             thread = DownloaderThread(publisher=publisher_instance,
                                       paper_entry_list=paper_list[
                                                        i * task_per_thread: (i + 1) * task_per_thread])
-            thread.finished_signal.connect(self.task_finished)
+            thread.finished_signal.connect(self.finish_downloader)
             thread.progress_signal.connect(self.update_progress)
             self.threads.append(thread)
 
@@ -522,6 +522,25 @@ class PaperDownloaderGUI(QMainWindow):
         self.pause_button.setEnabled(True)
         self.resume_button.setEnabled(False)
 
+    @pyqtSlot()
+    def finish_downloader(self):
+        self.mutex.lock()
+        self.finished_threads += 1
+        self.mutex.unlock()
+
+        if self.finished_threads == self.num_threads:
+            self.run_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            self.pause_button.setEnabled(False)
+            self.resume_button.setEnabled(False)
+
+            logging.info('Download Finished!')
+            QMessageBox.information(self,
+                                    self.languages[self.current_language]['notification'],
+                                    self.languages[self.current_language]['downloader_finished'])
+
+            self.reset_progress()
+
     @pyqtSlot(str)
     def append_log(self, log):
         self.log_output.append(log)
@@ -542,21 +561,6 @@ class PaperDownloaderGUI(QMainWindow):
     @pyqtSlot()
     def clear_log(self):
         self.log_output.clear()
-
-    @pyqtSlot()
-    def task_finished(self):
-        self.mutex.lock()
-        self.finished_threads += 1
-        self.mutex.unlock()
-
-        if self.finished_threads == self.num_threads:
-            self.run_button.setEnabled(True)
-            self.stop_button.setEnabled(False)
-            self.pause_button.setEnabled(False)
-            self.resume_button.setEnabled(False)
-
-            self.reset_progress()
-            logging.info('Download Finished!')
 
 
 if __name__ == '__main__':

@@ -41,7 +41,9 @@
     "clear": "清空",
     "export": "导出",
     "no_log_to_export": "没有日志可以导出!",
-    "select_save_file": "选择保存文件"
+    "select_save_file": "选择保存文件",
+    "notification": "通知",
+    "downloader_finished": "下载完成！"
   },
   "en": {
     "error": "Error",
@@ -85,6 +87,8 @@
     "clear": "Clear",
     "export": "Export",
     "no_log_to_export": "No log to export.",
-    "select_save_file": "Select Save File"
+    "select_save_file": "Select Save File",
+    "notification": "Notification",
+    "downloader_finished": "Downloader finished!"
   }
 }

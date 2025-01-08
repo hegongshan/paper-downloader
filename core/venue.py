@@ -8,9 +8,9 @@ from collections import OrderedDict
 from enum import Enum
 from typing import Dict, List, Tuple, Generator
 
-import downloader
-import html_parser
-import utils
+import core.downloader as downloader
+import core.html_parser as html_parser
+import core.utils as utils
 
 _Tag = html_parser.Tag
 
