@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup, element
 
 Tag = element.Tag
 
+
 def get_parser(html: str, parser: str = 'lxml') -> BeautifulSoup:
     return BeautifulSoup(html, parser)
 

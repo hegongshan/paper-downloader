@@ -1,5 +1,27 @@
 ### Academic Paper Bulk Downloader for Open Access Venues (APBDOAV)
 
+#### Project structure
+
+```shell
+paper-downloader/
+├── README.md
+├── cli.py
+├── config
+│   ├── config.json
+│   ├── gui.qss
+│   └── i18n
+│       └── lang.json
+├── core
+│   ├── downloader.py
+│   ├── html_parser.py
+│   ├── utils.py
+│   └── venue.py
+├── gui.py
+├── requirements.txt
+└── test
+    └── test.py
+```
+
 #### Install dependencies
 
 ```shell
