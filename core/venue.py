@@ -6,7 +6,7 @@ import time
 from abc import ABC, ABCMeta, abstractmethod
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Tuple, Generator
+from typing import Dict, List, Tuple
 
 import core.downloader as downloader
 import core.html_parser as html_parser
@@ -560,9 +560,9 @@ _venue_dict = {
 
     # Journal
     # Databases
-    'pvldb': {'name': 'PVLDB', 'publisher': PVLDB},
+    'pvldb': {'name': 'PVLDB(Journal)', 'publisher': PVLDB},
 
-    'jmlr': {'name': 'JMLR', 'publisher': JMLR},
+    'jmlr': {'name': 'JMLR(Journal)', 'publisher': JMLR},
 }
 
 

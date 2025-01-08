@@ -3,9 +3,7 @@ import logging
 import os
 import sys
 import threading
-import time
 
-import core.venue as venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
@@ -15,6 +13,8 @@ from PyQt5.QtWidgets import (
     QProgressBar
 )
 
+import core.venue as venue
+
 ##################################################################
 #                            Constant                            #
 ##################################################################
@@ -22,6 +22,7 @@ LANGUAGE_FILE = os.path.join('config', 'i18n', 'lang.json')
 CONFIG_FILE = os.path.join('config', 'config.json')
 QSS_FILE = os.path.join('config', 'gui.qss')
 DEFAULT_SLEEP_TIME = 2
+MAX_NUM_THREAD = 8
 
 
 ##################################################################
@@ -44,9 +45,7 @@ class DownloaderThread(QThread):
     progress_signal = pyqtSignal()
     finished_signal = pyqtSignal()
 
-    def __init__(self,
-                 publisher: type,
-                 paper_entry_list):
+    def __init__(self, publisher: type, paper_entry_list):
         super().__init__()
         self.publisher = publisher
         self.paper_entry_list = paper_entry_list
@@ -55,18 +54,27 @@ class DownloaderThread(QThread):
         self.stopped = False
         self.thread_id = None
 
+        # 初始化用于暂停和恢复的互斥锁和条件变量
+        self.pause_mutex = QMutex()
+        self.pause_condition = QWaitCondition()
+
     def pause(self):
         if self.isFinished():
             return
 
+        self.pause_mutex.lock()
         self.paused = True
+        self.pause_mutex.unlock()
         logging.info(f'Thread {self.thread_id} is pausing...')
 
     def resume(self):
         if self.isFinished():
             return
 
+        self.pause_mutex.lock()
         self.paused = False
+        self.pause_condition.wakeAll()  # 唤醒所有等待的线程
+        self.pause_mutex.unlock()
         logging.info(f'Thread {self.thread_id} is resuming...')
 
     def stop(self):
@@ -74,20 +82,31 @@ class DownloaderThread(QThread):
             return
 
         self.stopped = True
-        if self.paused:
-            self.paused = False
+        self.resume()  # 确保线程不会因为暂停而无法停止
         logging.info(f'Thread {self.thread_id} is stopping...')
 
     def run(self):
         self.thread_id = threading.get_native_id()
+        was_paused = False  # 标记线程是否已记录暂停状态
 
         for paper_entry in self.paper_entry_list:
             if self.stopped:
                 break
-            while self.paused:
-                pass
+
+            # 检查是否需要暂停
+            self.pause_mutex.lock()
+            if self.paused:
+                if not was_paused:
+                    logging.info(f'Thread {self.thread_id} has been paused.')
+                    was_paused = True  # 设置标记，避免重复记录
+                self.pause_condition.wait(self.pause_mutex)
+                logging.info(f'Thread {self.thread_id} has been resumed.')
+                was_paused = False  # 重置标记
+            self.pause_mutex.unlock()
+
             if self.stopped:
                 break
+
             self.publisher.process_one(paper_entry)
             self.progress_signal.emit()
 
@@ -475,7 +494,7 @@ class PaperDownloaderGUI(QMainWindow):
         self.num_tasks = len(paper_list)
 
         # 创建线程
-        self.num_threads = os.cpu_count() if parallel else 1
+        self.num_threads = min(os.cpu_count() if parallel else 1, MAX_NUM_THREAD)
         task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
         for i in range(self.num_threads):
             thread = DownloaderThread(publisher=publisher_instance,
@@ -500,15 +519,22 @@ class PaperDownloaderGUI(QMainWindow):
                 QMessageBox.No
             )
             if confirm == QMessageBox.Yes:
+                logging.info('Stopping all downloader threads...')
                 for thread in self.threads:
                     thread.stop()
+                for thread in self.threads:
                     thread.wait()
+                    logging.info(f'')
+                logging.info('All downloader threads have been stopped.')
+
         else:
             QMessageBox.information(self, 'Info', self.languages[self.current_language]['no_active_to_stop'])
 
     def pause_downloader(self):
+        logging.info('Pausing all downloader threads...')
         for thread in self.threads:
             thread.pause()
+
         self.run_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.pause_button.setEnabled(False)
