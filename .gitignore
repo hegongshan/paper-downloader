@@ -3,3 +3,7 @@ __pycache__
 
 paper
 *.log
+
+build
+dist
+*.spec

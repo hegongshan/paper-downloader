@@ -6,6 +6,7 @@ import threading
 import time
 from datetime import datetime
 
+import core.utils as utils
 import core.venue as venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
@@ -20,9 +21,9 @@ from PyQt5.QtWidgets import (
 ##################################################################
 #                            Constant                            #
 ##################################################################
-LANGUAGE_FILE = os.path.join('config', 'i18n', 'lang.json')
-CONFIG_FILE = os.path.join('config', 'config.json')
-QSS_FILE = os.path.join('config', 'gui.qss')
+LANGUAGE_FILE = utils.get_abs_path('config', os.path.join('i18n', 'lang.json'))
+CONFIG_FILE = utils.get_abs_path('config', 'config.json')
+QSS_FILE = utils.get_abs_path('config', 'gui.qss')
 DEFAULT_SLEEP_TIME = 2
 
 PROJECT_START_YEAR = 2024

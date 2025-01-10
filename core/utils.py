@@ -1,4 +1,6 @@
+import os
 import re
+import sys
 
 from enum import Enum
 
@@ -63,3 +65,11 @@ def print_warning(message: str) -> None:
 def print_success(message: str) -> None:
     success = _CLIColor.GREEN.value + message + _CLIColor.RESET.value
     print(success)
+
+
+def get_abs_path(default_dirname, relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        dirname = sys._MEIPASS
+    else:
+        dirname = os.path.abspath(default_dirname)
+    return os.path.join(dirname, relative_path)
