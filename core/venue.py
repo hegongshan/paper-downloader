@@ -13,7 +13,7 @@ from . import downloader, html_parser, utils
 _Tag = html_parser.Tag
 
 
-class DBLPVenueType(Enum):
+class _DBLPVenueType(Enum):
     CONFERENCE = 'conf'
     JOURNAL = 'journals'
 
@@ -21,7 +21,7 @@ class DBLPVenueType(Enum):
 ##################################################################
 #                       Abstract Class                           #
 ##################################################################
-class Base(ABC):
+class _Base(ABC):
     def __init__(self,
                  save_dir: str,
                  sleep_time_per_paper: float = 2,
@@ -108,7 +108,7 @@ class Base(ABC):
         parser = html_parser.get_parser(html)
 
         venue_type = self._get_dblp_venue_type()
-        if venue_type == DBLPVenueType.CONFERENCE.value:
+        if venue_type == _DBLPVenueType.CONFERENCE.value:
             paper_list_selector = '.inproceedings'
         else:
             paper_list_selector = '.article'
@@ -208,7 +208,7 @@ class Base(ABC):
         pass
 
 
-class Conference(Base, metaclass=ABCMeta):
+class _Conference(_Base, metaclass=ABCMeta):
     def __init__(self,
                  year: int,
                  save_dir: str,
@@ -217,7 +217,7 @@ class Conference(Base, metaclass=ABCMeta):
         super().__init__(save_dir, **kwargs)
 
 
-class Journal(Base, metaclass=ABCMeta):
+class _Journal(_Base, metaclass=ABCMeta):
     def __init__(self,
                  volume: int,
                  save_dir: str,
@@ -226,7 +226,7 @@ class Journal(Base, metaclass=ABCMeta):
         super().__init__(save_dir, **kwargs)
 
 
-class MultiConference(Conference, metaclass=ABCMeta):
+class _MultiConference(_Conference, metaclass=ABCMeta):
     def __init__(self,
                  venue_name: str,
                  year: int,
@@ -240,7 +240,7 @@ class MultiConference(Conference, metaclass=ABCMeta):
 #                           Conference                           #
 ##################################################################
 
-class USENIX(MultiConference):
+class USENIX(_MultiConference):
     def _get_url(self) -> str | None:
         if self.venue_name == 'atc':
             self.venue_name = 'usenix'
@@ -266,7 +266,7 @@ class USENIX(MultiConference):
         return html_parser.parse_href(html, '.usenix-schedule-slides a')
 
 
-class NDSS(Conference):
+class NDSS(_Conference):
 
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/ndss/ndss{self.year}.html'
@@ -281,7 +281,7 @@ class NDSS(Conference):
         return html_parser.parse_href(html, '.button-slides')
 
 
-class AAAI(Conference):
+class AAAI(_Conference):
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/aaai/aaai{self.year}.html'
 
@@ -295,7 +295,7 @@ class AAAI(Conference):
         pass
 
 
-class IJCAI(Conference):
+class IJCAI(_Conference):
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/ijcai/ijcai{self.year}.html'
 
@@ -309,7 +309,7 @@ class IJCAI(Conference):
         pass
 
 
-class CVF(MultiConference):
+class CVF(_MultiConference):
     def _get_url(self) -> str | None:
         available_confs = ['CVPR', 'ICCV']
         venue_name = self.venue_name.upper()
@@ -334,7 +334,7 @@ class CVF(MultiConference):
         pass
 
 
-class ECCV(Conference):
+class ECCV(_Conference):
     def _get_url(self) -> str | None:
         return 'https://www.ecva.net/papers.php'
 
@@ -373,7 +373,7 @@ class ECCV(Conference):
         pass
 
 
-class ICLR(Conference):
+class ICLR(_Conference):
 
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/iclr/iclr{self.year}.html'
@@ -393,7 +393,7 @@ class ICLR(Conference):
         pass
 
 
-class ICML(Conference):
+class ICML(_Conference):
 
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/icml/icml{self.year}.html'
@@ -417,7 +417,7 @@ class ICML(Conference):
         pass
 
 
-class NeurIPS(Conference):
+class NeurIPS(_Conference):
 
     def _get_url(self) -> str | None:
         if self.year <= 2019:
@@ -437,7 +437,7 @@ class NeurIPS(Conference):
         pass
 
 
-class ACL(MultiConference):
+class ACL(_MultiConference):
     def _get_url(self) -> str | None:
         available_confs = ['acl', 'emnlp', 'naacl']
 
@@ -465,7 +465,7 @@ class ACL(MultiConference):
         pass
 
 
-class RSS(Conference):
+class RSS(_Conference):
 
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/conf/rss/rss{self.year}.html'
@@ -484,7 +484,7 @@ class RSS(Conference):
 #                           Journal                              #
 ##################################################################
 
-class PVLDB(Journal):
+class PVLDB(_Journal):
 
     def _get_url(self) -> str | None:
         return f'https://dblp.org/db/journals/pvldb/pvldb{self.volume}.html'
@@ -499,7 +499,7 @@ class PVLDB(Journal):
         pass
 
 
-class JMLR(Journal):
+class JMLR(_Journal):
 
     def _get_url(self) -> str | None:
         return f'https://jmlr.org/papers/v{self.volume}/'
@@ -599,8 +599,8 @@ def parse_venue(venue: str) -> type | None:
 
 
 def is_conference(venue_publisher: type):
-    return issubclass(venue_publisher, Conference)
+    return issubclass(venue_publisher, _Conference)
 
 
 def is_journal(venue_publisher: type):
-    return issubclass(venue_publisher, Journal)
+    return issubclass(venue_publisher, _Journal)

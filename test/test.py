@@ -7,7 +7,7 @@ import unittest
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
-sys.path.append(os.path.join(parent_dir))
+sys.path.append(parent_dir)
 
 from core import venue
 
@@ -19,16 +19,28 @@ logging.basicConfig(level=logging.INFO,
 
 
 class Test(unittest.TestCase):
+    full_test = False
 
-    def _test_conf(self, venue_name, correct_year_range, error_year_range=None):
+    def _test_conf(self,
+                   venue_name,
+                   correct_year_range,
+                   error_year_range=None):
         save_dir_ = os.path.join(save_dir_prefix, venue_name)
 
         venue_publisher = venue.parse_venue(venue_name)
 
-        if error_year_range:
-            year_range = list(correct_year_range) + list(error_year_range)
+        if self.full_test:
+            # 每个年份都要处理
+            correct_year_len = len(correct_year_range)
+            year_range = list(correct_year_range)
+            if error_year_range:
+                year_range += list(error_year_range)
         else:
-            year_range = correct_year_range
+            # 随机选择一个年份
+            correct_year_len = 1
+            year_range = random.sample(correct_year_range, 1)
+            if error_year_range:
+                year_range += random.sample(error_year_range, 1)
 
         for idx, year in enumerate(year_range):
             save_dir = os.path.join(save_dir_, str(year))
@@ -44,13 +56,19 @@ class Test(unittest.TestCase):
             if not paper_list:
                 return
 
+            # 随机选择一篇论文
             paper_entry = random.sample(paper_list, 1)[0]
             publisher.process_one(paper_entry)
-            if idx < len(correct_year_range):
+            if idx < correct_year_len:
                 self.assertEqual(len(os.listdir(save_dir)), 1)
             else:
                 self.assertEqual(len(os.listdir(save_dir)), 0)
             logging.info(f'Test Done!')
+
+    def test_fast(self):
+        venue_name = 'fast'
+        self._test_conf(venue_name=venue_name,
+                        correct_year_range=range(2002, 2024 + 1))
 
     def test_icml(self):
         venue_name = 'icml'
