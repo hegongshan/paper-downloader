@@ -2,9 +2,14 @@ import logging
 import os
 import random
 import shutil
+import sys
 import unittest
 
-import venue
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+sys.path.append(os.path.join(parent_dir))
+
+from core import venue
 
 save_dir_prefix = os.path.join('paper', 'test')
 sleep_time_per_paper = 2

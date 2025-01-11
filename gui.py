@@ -6,8 +6,6 @@ import threading
 import time
 from datetime import datetime
 
-import core.utils as utils
-import core.venue as venue
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
@@ -17,6 +15,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox,
     QProgressBar, QDialog
 )
+from core import utils, venue
 
 ##################################################################
 #                            Constant                            #

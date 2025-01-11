@@ -3,8 +3,7 @@ import concurrent.futures
 import logging
 import os
 
-import core.utils as utils
-import core.venue as venue
+from core import utils, venue
 from tqdm import tqdm
 
 DEFAULT_LOG_FILE = 'paper-downloader.log'
