@@ -59,10 +59,13 @@ class Test(unittest.TestCase):
             # 随机选择一篇论文
             paper_entry = random.sample(paper_list, 1)[0]
             publisher.process_one(paper_entry)
+
+            count = len(os.listdir(save_dir))
             if idx < correct_year_len:
-                self.assertEqual(len(os.listdir(save_dir)), 1)
+                # paper + slides
+                self.assertTrue(1 <= count <= 2)
             else:
-                self.assertEqual(len(os.listdir(save_dir)), 0)
+                self.assertTrue(count == 0)
             logging.info(f'Test Done!')
 
     def test_fast(self):
