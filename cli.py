@@ -57,7 +57,7 @@ def parse_args():
     return args.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     args = parse_args()
 
     # config logging
@@ -121,3 +121,7 @@ if __name__ == '__main__':
                 publisher.process_one(paper_entry)
 
     utils.print_success('Task Done!')
+
+
+if __name__ == '__main__':
+    main()
