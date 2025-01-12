@@ -68,14 +68,18 @@ class Test(unittest.TestCase):
                 self.assertTrue(count == 0)
             logging.info(f'Test Done!')
 
+        shutil.rmtree(save_dir_)
+
     def test_fast(self):
-        venue_name = 'fast'
-        self._test_conf(venue_name=venue_name,
+        self._test_conf(venue_name='fast',
                         correct_year_range=range(2002, 2024 + 1))
 
+    def test_osdi(self):
+        self._test_conf(venue_name='osdi',
+                        correct_year_range=list(range(2002, 2020 + 2, 2)) + list(range(2021, 2024 + 1, 1)))
+
     def test_icml(self):
-        venue_name = 'icml'
-        self._test_conf(venue_name=venue_name,
+        self._test_conf(venue_name='icml',
                         correct_year_range=range(2010, 2024 + 1),
                         error_year_range=range(1980, 2009 + 1))
 
