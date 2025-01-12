@@ -569,7 +569,7 @@ _venue_dict = {
 }
 
 
-def get_available_venue_list(lower_case=True) -> List[str]:
+def get_available_venue_list(lower_case: bool = True) -> List[str]:
     if lower_case:
         venues = _venue_dict.keys()
     else:
@@ -577,7 +577,7 @@ def get_available_venue_list(lower_case=True) -> List[str]:
     return list(venues)
 
 
-def get_available_venues(lower_case=True) -> str:
+def get_available_venues(lower_case: bool = True) -> str:
     return ','.join(get_available_venue_list(lower_case=lower_case))
 
 

@@ -63,10 +63,26 @@ options:
   --parallel            Use parallel downloads.
 ```
 
-* Example
+##### Example
 
 ```shell
 $ python3 cli.py --venue fast --year 2023
+```
+
+#### GUI mode
+
+##### How to Package
+
+* Linux/macOS
+
+```shell
+$ ./script/build.sh
+```
+
+* Windows
+
+```shell
+$ ./script/build.bat
 ```
 
 #### Supported Venue
