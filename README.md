@@ -10,10 +10,14 @@ paper-downloader/
 │   ├── config.json
 │   └── gui.qss
 ├── core
+│   ├── __init__.py
 │   ├── downloader.py
 │   ├── html_parser.py
 │   ├── utils.py
 │   └── venue.py
+├── script
+│   ├── build.bat
+│   └── build.sh
 ├── test
 │   └── test.py
 ├── README.md
