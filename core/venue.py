@@ -250,7 +250,12 @@ class USENIX(_MultiConference):
             logging.error(f'error: unknown confernce {self.venue_name}')
             return None
 
-        return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}.html'
+        if self.venue_name == 'usenix' and 1999 <= self.year <= 2006:
+            suffix = 'g'
+        else:
+            suffix = ''
+
+        return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}{suffix}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
