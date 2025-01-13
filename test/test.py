@@ -4,7 +4,7 @@ import random
 import shutil
 import unittest
 
-import core.venue as venue
+from core import venue
 
 save_dir_prefix = os.path.join('paper', 'test')
 sleep_time_per_paper = 2

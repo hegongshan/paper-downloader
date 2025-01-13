@@ -528,6 +528,7 @@ class PaperDownloaderGUI(QMainWindow):
         self.start_progress()
         for thread in self.threads:
             thread.start()
+
     def stop_downloader(self):
         """点击「Stop」按钮后，仅发送停止请求，不阻塞主线程"""
         if self.threads:
