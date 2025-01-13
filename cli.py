@@ -3,8 +3,7 @@ import concurrent.futures
 import logging
 import os
 
-import core.utils as utils
-import core.venue as venue
+from core import utils, venue
 from tqdm import tqdm
 
 DEFAULT_LOG_FILE = 'paper-downloader.log'
@@ -58,7 +57,7 @@ def parse_args():
     return args.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     args = parse_args()
 
     # config logging
@@ -122,3 +121,7 @@ if __name__ == '__main__':
                 publisher.process_one(paper_entry)
 
     utils.print_success('Task Done!')
+
+
+if __name__ == '__main__':
+    main()

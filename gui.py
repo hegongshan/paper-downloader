@@ -4,25 +4,35 @@ import os
 import sys
 import threading
 
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, Qt, QWaitCondition
+from datetime import datetime
+
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt, QUrl
+from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QTextEdit,
     QMessageBox, QGridLayout, QGroupBox, QRadioButton,
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox,
-    QProgressBar
+    QProgressBar, QDialog
 )
-
-from core import venue
+from core import utils, venue
 
 ##################################################################
 #                            Constant                            #
 ##################################################################
-LANGUAGE_FILE = os.path.join('config', 'i18n', 'lang.json')
-CONFIG_FILE = os.path.join('config', 'config.json')
-QSS_FILE = os.path.join('config', 'gui.qss')
+LANGUAGE_FILE = utils.get_abs_path('config', os.path.join('i18n', 'lang.json'))
+CONFIG_FILE = utils.get_abs_path('config', 'config.json')
+QSS_FILE = utils.get_abs_path('config', 'gui.qss')
 DEFAULT_SLEEP_TIME = 2
 MAX_NUM_THREAD = 8
+
+PROJECT_START_YEAR = 2024
+PROJECT_VERSION = 'v1.0'
+PROJECT_URL = 'https://github.com/hegongshan/paper-downloader'
+PROJECT_AUTHORS = [
+    '<a href="https://github.com/hegongshan">Gongshan He</a>',
+    '<a href="https://github.com/zh-he">Zhihai He</a>'
+]
 
 
 ##################################################################
@@ -175,15 +185,25 @@ class PaperDownloaderGUI(QMainWindow):
                     self.current_language = config_dict['default_language']
 
     def init_ui(self):
-        self.setWindowTitle(self.languages[self.current_language]['window_title'])
+        self.setWindowTitle(self.languages[self.current_language]['project_abbreviation'])
 
         # Menu Bar
         menubar = self.menuBar()
+        # Language Menu
         self.language_menu = QMenu(self.languages[self.current_language]['language'], self)
         self.language_action = QAction(self.languages[self.current_language]['language_switch'], self)
         self.language_action.triggered.connect(self.update_language)
         self.language_menu.addAction(self.language_action)
         menubar.addMenu(self.language_menu)
+        # Help Menu
+        self.help_menu = QMenu(self.languages[self.current_language]['help'])
+        self.help_action = QAction(self.languages[self.current_language]['help'])
+        self.help_action.triggered.connect(self.open_project_link)
+        self.about_action = QAction(self.languages[self.current_language]['about'])
+        self.about_action.triggered.connect(self.show_about)
+        self.help_menu.addAction(self.help_action)
+        self.help_menu.addAction(self.about_action)
+        menubar.addMenu(self.help_menu)
 
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
@@ -345,6 +365,42 @@ class PaperDownloaderGUI(QMainWindow):
             logger.removeHandler(handler)
         logger.addHandler(log_handler)
 
+    @staticmethod
+    def open_project_link():
+        QDesktopServices.openUrl(QUrl(PROJECT_URL))
+
+    def show_about(self):
+        about_dialog = QDialog()
+        about_dialog.setWindowTitle(self.languages[self.current_language]['about'])
+        vbox_layout = QVBoxLayout()
+
+        project_name_label = QLabel(self.languages[self.current_language]['project_name'])
+        project_name_label.setAlignment(Qt.AlignCenter)
+        vbox_layout.addWidget(project_name_label)
+
+        grid_layout = QGridLayout()
+        project_abbreviation_label = QLabel(self.languages[self.current_language]['abbreviation'])
+        project_abbreviation_content = QLabel(self.languages[self.current_language]['project_abbreviation'])
+        project_version_label = QLabel(self.languages[self.current_language]['version'])
+        project_version_content = QLabel(PROJECT_VERSION)
+        author_label = QLabel(self.languages[self.current_language]["author"])
+        author_list = QLabel(', '.join(PROJECT_AUTHORS))
+        author_list.setOpenExternalLinks(True)
+        grid_layout.addWidget(project_abbreviation_label, 0, 0)
+        grid_layout.addWidget(project_abbreviation_content, 0, 1)
+        grid_layout.addWidget(project_version_label, 1, 0)
+        grid_layout.addWidget(project_version_content, 1, 1)
+        grid_layout.addWidget(author_label, 2, 0)
+        grid_layout.addWidget(author_list, 2, 1)
+        vbox_layout.addLayout(grid_layout)
+
+        copyright_label = QLabel(f'Copyright © {PROJECT_START_YEAR}-{datetime.now().year}')
+        copyright_label.setAlignment(Qt.AlignCenter)
+        vbox_layout.addWidget(copyright_label)
+
+        about_dialog.setLayout(vbox_layout)
+        about_dialog.exec_()
+
     def start_progress(self):
         self.mutex.lock()
         self.progress_bar.setValue(0)
@@ -377,10 +433,13 @@ class PaperDownloaderGUI(QMainWindow):
                 'default_language': self.current_language
             }, file, ensure_ascii=False, indent=4)
 
-        self.setWindowTitle(self.languages[self.current_language]['window_title'])
+        self.setWindowTitle(self.languages[self.current_language]['project_abbreviation'])
 
         self.language_menu.setTitle(self.languages[self.current_language]['language'])
         self.language_action.setText(self.languages[self.current_language]['language_switch'])
+        self.help_menu.setTitle(self.languages[self.current_language]['help'])
+        self.help_action.setText(self.languages[self.current_language]['help'])
+        self.about_action.setText(self.languages[self.current_language]['about'])
 
         self.basic_settings.setTitle(self.languages[self.current_language]['basic_settings'])
         self.venue_label.setText(self.languages[self.current_language]['venue_label'])
