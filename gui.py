@@ -15,7 +15,9 @@ from PyQt5.QtWidgets import (
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox,
     QProgressBar, QDialog
 )
+
 from core import utils, venue
+
 
 ##################################################################
 #                            Constant                            #
@@ -49,13 +51,36 @@ class QtLogHandler(logging.Handler):
 
 
 ##################################################################
+#                   Thread for Fetching Paper List              #
+##################################################################
+class PaperListFetchThread(QThread):
+    """
+    专门用于获取 paper_list 的线程，防止在主线程里直接调用导致卡顿
+    """
+    paper_list_ready = pyqtSignal(list)   # 获取列表成功时，发射此信号并传递 paper_list
+    error_signal = pyqtSignal(str)        # 获取列表出错时，发射此信号
+
+    def __init__(self, publisher_instance):
+        super().__init__()
+        self.publisher_instance = publisher_instance
+
+    def run(self):
+        try:
+            paper_list = self.publisher_instance.get_paper_list()
+            self.paper_list_ready.emit(paper_list)
+        except Exception as e:
+            logging.exception("Exception occurred while fetching paper list.")
+            self.error_signal.emit(str(e))
+
+
+##################################################################
 #                         Worker Thread                          #
 ##################################################################
 class DownloaderThread(QThread):
     progress_signal = pyqtSignal()
     finished_signal = pyqtSignal()
     resumed_signal = pyqtSignal(int)  # 用于通知主线程：本线程已恢复
-    paused_signal = pyqtSignal(int)  # 用于通知主线程：本线程已进入暂停
+    paused_signal = pyqtSignal(int)   # 用于通知主线程：本线程已进入暂停
 
     def __init__(self, publisher: type, paper_entry_list):
         super().__init__()
@@ -158,6 +183,9 @@ class PaperDownloaderGUI(QMainWindow):
         self.mutex = QMutex()
         self.paused_count = 0
         self.resumed_count = 0
+
+        # 新增一个用于获取 paper_list 的线程引用
+        self.list_fetch_thread = None
 
         self.init_language()
         self.init_ui()
@@ -476,6 +504,7 @@ class PaperDownloaderGUI(QMainWindow):
 
     def run_downloader(self):
         logging.info('Input Checking...')
+
         venue_name = self.venue_input.currentText().strip()
         save_dir = self.save_dir_input.text().strip()
         sleep_time_per_paper = self.sleep_time_input.text().strip()
@@ -484,7 +513,6 @@ class PaperDownloaderGUI(QMainWindow):
         volume = self.volume_input.text().strip()
         http_proxy = self.http_proxy_input.text().strip()
         https_proxy = self.https_proxy_input.text().strip()
-        parallel = self.btn_group.checkedButton().text() == self.languages[self.current_language]['enable']
 
         if not venue_name:
             QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['venue_required'])
@@ -500,13 +528,13 @@ class PaperDownloaderGUI(QMainWindow):
         if not venue_publisher:
             QMessageBox.warning(self, 'Input Error',
                                 f'{self.languages[self.current_language]["venue_unsupported"]}{venue_name_lower}')
-            return None
+            return
 
+        # 判定是会议还是期刊，并检查 year/volume
         if venue.is_conference(venue_publisher):
             if not year:
                 QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['year_required'])
                 return
-
             try:
                 year = int(year)
             except ValueError:
@@ -515,12 +543,12 @@ class PaperDownloaderGUI(QMainWindow):
 
             if volume:
                 logging.warning(
-                    f'Warning: The conference "{venue_name}" does not require the volume field, but it is currently set to "{volume}".')
+                    f'Warning: The conference "{venue_name}" does not require the volume field, but it is currently set to "{volume}".'
+                )
         else:
             if not volume:
                 QMessageBox.warning(self, 'Input Error', self.languages[self.current_language]['volume_required'])
                 return
-
             try:
                 volume = int(volume)
             except ValueError:
@@ -529,7 +557,8 @@ class PaperDownloaderGUI(QMainWindow):
 
             if year:
                 logging.warning(
-                    f'Warning: The journal "{venue_name}" does not require the year field, but it is currently set to "{year}".')
+                    f'Warning: The journal "{venue_name}" does not require the year field, but it is currently set to "{year}".'
+                )
 
         try:
             sleep_time_per_paper = float(sleep_time_per_paper) if sleep_time_per_paper else DEFAULT_SLEEP_TIME
@@ -539,12 +568,12 @@ class PaperDownloaderGUI(QMainWindow):
 
         logging.info('Check complete!')
 
-        # 更新按钮状态
+        # 更新按钮状态，先全部禁用，等获取列表成功后再启用
         self.run_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        self.pause_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.pause_button.setEnabled(False)
         self.resume_button.setEnabled(False)
-        logging.info('Starting download...')
+        logging.info('Starting to fetch paper list...')
 
         # 设置代理
         proxies = {}
@@ -554,7 +583,7 @@ class PaperDownloaderGUI(QMainWindow):
             proxies['https'] = https_proxy
 
         # 实例化publisher
-        publisher_instance = venue_publisher(
+        self.publisher_instance = venue_publisher(
             save_dir=save_dir,
             sleep_time_per_paper=sleep_time_per_paper,
             keyword=keyword,
@@ -564,45 +593,96 @@ class PaperDownloaderGUI(QMainWindow):
             proxies=proxies
         )
 
-        paper_list = publisher_instance.get_paper_list()
+        # 显示进度条，提示用户正在获取列表
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Fetching paper list...")
+        self.progress_bar.show()
+
+        # 启动获取列表的线程
+        self.list_fetch_thread = PaperListFetchThread(self.publisher_instance)
+        self.list_fetch_thread.paper_list_ready.connect(self.on_paper_list_ready)
+        self.list_fetch_thread.error_signal.connect(self.on_paper_list_error)
+        self.list_fetch_thread.start()
+
+    @pyqtSlot(list)
+    def on_paper_list_ready(self, paper_list):
+        self.list_fetch_thread = None
+
+        self.progress_bar.setFormat("%p%")
+        # 重置进度条文字
         if not paper_list:
             logging.warning('The paper list is empty!')
+            QMessageBox.information(self, "Info", "No papers to download.")
+            self.reset_progress()
+            self.run_button.setEnabled(True)
             return
 
+        logging.info(f"{len(paper_list)} papers have been fetched.")
         self.num_tasks = len(paper_list)
-        # 创建线程
-        self.num_threads = min(os.cpu_count() if parallel else 1, MAX_NUM_THREAD)
-        task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
+        self.task_complete_count = 0
+
+        # 判断并行/串行
+        parallel = (self.btn_group.checkedButton().text() == self.languages[self.current_language]['enable'])
+        self.num_threads = min(os.cpu_count(), MAX_NUM_THREAD) if parallel else 1
         logging.info(f"The total number of threads is {self.num_threads}.")
+
+        publisher_instance = self.publisher_instance
+
+        # 进行任务切分并创建 DownloaderThread
+        self.threads = []
+        task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
         for i in range(self.num_threads):
-            thread = DownloaderThread(publisher=publisher_instance,
-                                      paper_entry_list=paper_list[
-                                                       i * task_per_thread: (i + 1) * task_per_thread])
+            sub_list = paper_list[i * task_per_thread: (i + 1) * task_per_thread]
+            thread = DownloaderThread(
+                publisher=publisher_instance,
+                paper_entry_list=sub_list
+            )
             thread.finished_signal.connect(self.finish_downloader)
             thread.progress_signal.connect(self.update_progress)
             thread.paused_signal.connect(self.on_thread_paused)
             thread.resumed_signal.connect(self.on_thread_resumed)
             self.threads.append(thread)
 
+        # 更新按钮状态
+        self.stop_button.setEnabled(True)
+        self.pause_button.setEnabled(True)
+        self.resume_button.setEnabled(False)
+
+        # 启动下载线程
         self.start_progress()
         for thread in self.threads:
             thread.start()
+
+    @pyqtSlot(str)
+    def on_paper_list_error(self, err_msg):
+        """
+        当 PaperListFetchThread 出错时，触发此槽函数
+        """
+        self.list_fetch_thread = None
+        logging.error(f"Failed to fetch paper list: {err_msg}")
+        QMessageBox.critical(self, "Error", f"Error while fetching paper list:\n{err_msg}")
+
+        self.reset_progress()
+        # 恢复“Run”按钮可用
+        self.run_button.setEnabled(True)
 
     def stop_downloader(self):
         """点击「Stop」按钮后，仅发送停止请求，不阻塞主线程"""
         if self.threads:
             confirm = QMessageBox.question(
-                self, "Stop", "Do you really want to stop all threads?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                self,
+                self.languages[self.current_language]['stop_confirm_title'],
+                self.languages[self.current_language]['stop_confirm_text'],
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
             )
             if confirm == QMessageBox.Yes:
                 logging.info('Stopping all downloader threads...')
                 for thread in self.threads:
                     thread.stop()
-                # 不要调用 thread.wait()，以免阻塞
                 logging.info('Stop signal sent to all downloader threads.')
         else:
-            QMessageBox.information(self, 'Info', 'No active tasks to stop.')
+            QMessageBox.information(self, 'Info', self.languages[self.current_language]['no_active_to_stop'])
 
     def pause_downloader(self):
         logging.info('Pausing all downloader threads...')
@@ -620,7 +700,6 @@ class PaperDownloaderGUI(QMainWindow):
 
     def resume_downloader(self):
         logging.info('Resuming all downloader threads...')
-        # 每次 resume 前，将 resumed_count 置 0，等待所有线程再次恢复
         self.resumed_count = 0
 
         for thread in self.threads:
@@ -634,21 +713,27 @@ class PaperDownloaderGUI(QMainWindow):
     @pyqtSlot(int)
     def on_thread_paused(self, thread_id: int):
         """某个线程进入 paused 状态时的回调"""
+        self.mutex.lock()
         self.paused_count += 1
+        self.mutex.unlock()
         if self.paused_count == self.num_threads:
             logging.info("All threads have been paused.")
 
     @pyqtSlot(int)
     def on_thread_resumed(self, thread_id: int):
         """某个线程恢复时的回调"""
+        self.mutex.lock()
         self.resumed_count += 1
+        self.mutex.unlock()
         if self.resumed_count == self.num_threads:
             logging.info("All threads have been resumed.")
 
     @pyqtSlot()
     def finish_downloader(self):
         """某个线程结束时的回调"""
+        self.mutex.lock()
         self.finished_threads += 1
+        self.mutex.unlock()
         if self.finished_threads == self.num_threads:
             # 所有线程都结束
             self.run_button.setEnabled(True)
@@ -675,9 +760,10 @@ class PaperDownloaderGUI(QMainWindow):
             return
 
         filename, _ = QFileDialog.getSaveFileName(self, self.languages[self.current_language]['select_save_file'])
-        with open(filename, 'a', encoding='utf-8') as file:
-            file.write(log)
-            file.write('\n')
+        if filename:
+            with open(filename, 'a', encoding='utf-8') as file:
+                file.write(log)
+                file.write('\n')
 
     @pyqtSlot()
     def clear_log(self):
