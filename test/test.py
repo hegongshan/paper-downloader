@@ -133,7 +133,7 @@ class Test(unittest.TestCase):
 
     def test_osdi(self):
         self._process(venue_name='osdi',
-                      correct_range=list(range(2002, 2022, 2)) + list(range(2021, 2024 + 1)))
+                      correct_range=list(range(2002, 2020 + 2, 2)) + list(range(2021, 2024 + 1)))
 
     def test_fast(self):
         self._process(venue_name='fast',
