@@ -74,7 +74,9 @@ class Test(unittest.TestCase):
     ## conference
     def test_aaai(self):
         self._process(venue_name='aaai',
-                      correct_range=list(range(1980, 2024 + 1)))
+                      correct_range=list(range(2010, 2024 + 1)) + list(range(2004, 2008 + 1)) +
+                                    [2002, 2000, 1999, 1998, 1997, 1996, 1994, 1993, 1992, 1991, 1990, 1988, 1987, 1986,
+                                     1984, 1983, 1982, 1980])
 
     def test_ijcai(self):
         self._process(venue_name='ijcai',
@@ -150,11 +152,13 @@ class Test(unittest.TestCase):
     ## Journal
     def test_jmlr(self):
         self._process(venue_name='jmlr',
-                      correct_range=range(1, 25 + 1))
+                      correct_range=range(1, 25 + 1),
+                      is_conf=False)
 
     def test_pvldb(self):
         self._process(venue_name='pvldb',
-                      correct_range=range(1, 18 + 1))
+                      correct_range=range(1, 18 + 1),
+                      is_conf=False)
 
 
 if __name__ == '__main__':
