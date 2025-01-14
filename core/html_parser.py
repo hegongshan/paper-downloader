@@ -26,6 +26,13 @@ def parse_href(html: str, a_selector: str) -> str | None:
     return get_href_first(parser.select(a_selector))
 
 
+def try_parse_href(html: str, a_selector: str, default_a_selector: str) -> str | None:
+    result = parse_href(html, a_selector)
+    if result:
+        return result
+    return parse_href(html, default_a_selector)
+
+
 def get_text(tag: Tag) -> str | None:
     if not tag or not tag.text:
         return None

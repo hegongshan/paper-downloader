@@ -261,11 +261,7 @@ class USENIX(_MultiConference):
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
-        result = html_parser.parse_href(html, '.file a')
-        if result:
-            return result
-
-        return html_parser.parse_href(html, '[href$=".pdf"]')
+        return html_parser.try_parse_href(html, '.file a', 'a[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         return html_parser.parse_href(html, '.usenix-schedule-slides a')
@@ -280,7 +276,7 @@ class NDSS(_Conference):
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
-        return html_parser.parse_href(html, '.pdf-button')
+        return html_parser.try_parse_href(html, '.pdf-button', 'a[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         return html_parser.parse_href(html, '.button-slides')
@@ -436,7 +432,7 @@ class NeurIPS(_Conference):
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
-        return html_parser.parse_href(html, '.col a.btn-primary')
+        return html_parser.parse_href(html, '.col a[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
@@ -479,7 +475,7 @@ class RSS(_Conference):
         pass
 
     def _get_paper_file_url(self, html: str) -> str:
-        pass
+        return html_parser.parse_href(html, 'a[href$=".pdf"]')
 
     def _get_slides_file_url(self, html: str) -> str:
         pass
