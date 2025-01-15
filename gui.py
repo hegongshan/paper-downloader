@@ -742,7 +742,7 @@ class PaperDownloaderGUI(QMainWindow):
 
             logging.info('All downloader threads have been stopped or finished normally.')
             logging.info('Download Finished!')
-            QMessageBox.information(self, "Finish", "All tasks are done.")
+            QMessageBox.information(self, "Finish", self.languages[self.current_language]['task_completed'])
 
             self.reset_progress()
 
