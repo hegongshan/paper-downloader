@@ -31,7 +31,7 @@ def download_html(url: str, proxies: Dict[str, str] = None) -> str | None:
         r.raise_for_status()
         r.encoding = r.apparent_encoding
         return r.text
-    except requests.HTTPError as e:
+    except Exception as e:
         logging.error(f'download html: {url}, error: {e}')
 
 

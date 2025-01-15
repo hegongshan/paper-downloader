@@ -1,22 +1,32 @@
 QWidget {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #eeeeee);
-    /*font-family: "Segoe UI", Arial, sans-serif;*/
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, 
+                                stop: 0 #f5f7fa, 
+                                stop: 1 #e2e6ea);
     font-size: 14px;
-    color: #333333;
+    color: #333;
+    font-family: "Segoe UI", Arial, sans-serif;
 }
 
-QLineEdit, QPushButton, QTextEdit, QComboBox {
-    border: 1px solid #cccccc;
+QLineEdit, QComboBox, QTextEdit {
+    border: 1px solid #ccc;
     border-radius: 6px;
     padding: 6px;
-    background-color: #ffffff;
+    background-color: #fff;
+    selection-color: #fff;
+    selection-background-color: #5C9BD5;
+}
+
+QLineEdit:hover, QComboBox:hover, QTextEdit:hover {
+    border: 1px solid #5C9BD5;
 }
 
 QPushButton {
     background-color: #5C9BD5;
-    color: white;
+    color: #fff;
     font-weight: bold;
     border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
 }
 
 QPushButton:hover {
@@ -27,6 +37,7 @@ QPushButton:pressed {
     background-color: #3b79b0;
 }
 
+
 QPushButton:disabled {
     background-color: #d6d6d6;
     color: #a9a9a9;
@@ -34,21 +45,22 @@ QPushButton:disabled {
 
 QLabel {
     font-weight: bold;
-    color: #333333;
+    color: #333;
     margin-right: 5px;
 }
 
 QGroupBox {
-    border: 1px solid #cccccc;
+    border: 1px solid #ccc;
     border-radius: 10px;
     margin-top: 20px;
-    background-color: #ffffff;
+    background-color: #fff;
+    padding: 10px;
 }
 
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top center;
-    color: #333333;
+    color: #333;
     font-weight: bold;
     background: transparent;
     padding: 0 10px;
@@ -56,15 +68,29 @@ QGroupBox::title {
 
 QPushButton#helpButton {
     background-color: #28a745;
-    color: #ffffff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
 }
+
 QPushButton#helpButton:hover {
     background-color: #218838;
 }
+
 QPushButton#helpButton:pressed {
     background-color: #1e7e34;
 }
 
+QProgressBar {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    text-align: center;
+    background: #f0f0f0;
+    height: 20px;
+}
+
 QProgressBar::chunk {
     background-color: #5C9BD5;
+    border-radius: 6px;
 }

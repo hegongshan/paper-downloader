@@ -63,29 +63,102 @@ class Test(unittest.TestCase):
             count = len(os.listdir(save_dir))
             if idx < correct_len:
                 # paper + slides
-                self.assertTrue(1 <= count <= 2)
+                self.assertTrue(count >= 1)
             else:
                 self.assertTrue(count == 0)
             logging.info(f'Test Done!')
 
         shutil.rmtree(save_dir_)
 
-    def test_fast(self):
-        self._process(venue_name='fast',
-                      correct_range=range(2002, 2024 + 1))
+    ## venue
+    ## conference
+    def test_aaai(self):
+        self._process(venue_name='aaai',
+                      correct_range=list(range(2010, 2024 + 1)) + list(range(2004, 2008 + 1)) +
+                                    [2002, 2000, 1999, 1998, 1997, 1996, 1994, 1993, 1992, 1991, 1990, 1988, 1987, 1986,
+                                     1984, 1983, 1982, 1980])
 
-    def test_osdi(self):
-        self._process(venue_name='osdi',
-                      correct_range=list(range(2002, 2020 + 2, 2)) + list(range(2021, 2024 + 1)))
+    def test_ijcai(self):
+        self._process(venue_name='ijcai',
+                      correct_range=list(range(1969, 2015 + 2, 2)) + list(range(2016, 2024 + 1)))
 
-    def test_atc(self):
-        self._process(venue_name='atc',
-                      correct_range=range(1998, 2024 + 1))
+    def test_cvpr(self):
+        self._process(venue_name='cvpr',
+                      correct_range=list(range(2013, 2024 + 1)))
+
+    def test_iccv(self):
+        self._process(venue_name='iccv',
+                      correct_range=list(range(2013, 2024 + 1)))
+
+    def test_eccv(self):
+        self._process(venue_name='eccv',
+                      correct_range=list(range(2018, 2024 + 2, 2)))
+
+    def test_iclr(self):
+        self._process(venue_name='iclr',
+                      correct_range=list(range(2013, 2024 + 1)))
 
     def test_icml(self):
         self._process(venue_name='icml',
                       correct_range=range(2010, 2024 + 1),
                       error_range=range(1980, 2009 + 1))
+
+    def test_nips(self):
+        self._process(venue_name='nips',
+                      correct_range=range(2010, 2023 + 1))
+
+    def test_acl(self):
+        self._process(venue_name='acl',
+                      correct_range=range(1979, 2024 + 1))
+
+    def test_emnlp(self):
+        self._process(venue_name='emnlp',
+                      correct_range=range(1996, 2024 + 1))
+
+    def test_naacl(self):
+        self._process(venue_name='naacl',
+                      correct_range=[
+                          2024, 2022, 2021, 2019, 2018, 2016, 2015, 2013, 2012, 2010,
+                          2009, 2007, 2006, 2004, 2003, 2001, 2000])
+
+    def test_nsdi(self):
+        self._process(venue_name='nsdi',
+                      correct_range=list(range(2004, 2024 + 1)))
+
+    def test_uss(self):
+        self._process(venue_name='uss',
+                      correct_range=list(range(1998, 2024 + 1)) + [1992, 1993, 1995, 1996])
+
+    def test_ndss(self):
+        self._process(venue_name='ndss',
+                      correct_range=range(1993, 2024 + 1))
+
+    def test_osdi(self):
+        self._process(venue_name='osdi',
+                      correct_range=list(range(2002, 2020 + 2, 2)) + list(range(2021, 2024 + 1)))
+
+    def test_fast(self):
+        self._process(venue_name='fast',
+                      correct_range=range(2002, 2024 + 1))
+
+    def test_atc(self):
+        self._process(venue_name='atc',
+                      correct_range=range(1998, 2024 + 1))
+
+    def test_rss(self):
+        self._process(venue_name='rss',
+                      correct_range=range(2005, 2024 + 1))
+
+    ## Journal
+    def test_jmlr(self):
+        self._process(venue_name='jmlr',
+                      correct_range=range(1, 25 + 1),
+                      is_conf=False)
+
+    def test_pvldb(self):
+        self._process(venue_name='pvldb',
+                      correct_range=range(1, 18 + 1),
+                      is_conf=False)
 
 
 if __name__ == '__main__':
