@@ -79,8 +79,8 @@ class PaperListFetchThread(QThread):
 class DownloaderThread(QThread):
     progress_signal = pyqtSignal()
     finished_signal = pyqtSignal()
-    resumed_signal = pyqtSignal(int)  # 用于通知主线程：本线程已恢复
-    paused_signal = pyqtSignal(int)   # 用于通知主线程：本线程已进入暂停
+    resumed_signal = pyqtSignal()  # 用于通知主线程：本线程已恢复
+    paused_signal = pyqtSignal()   # 用于通知主线程：本线程已进入暂停
 
     def __init__(self, publisher: type, paper_entry_list):
         super().__init__()
@@ -139,10 +139,10 @@ class DownloaderThread(QThread):
                 break
 
             # 若处于暂停状态，则在这里等待
-            while self.paused and not self.stopped:
+            if self.paused:
                 # 只在刚进 while 的时候发射一次 paused_signal，避免刷屏
                 logging.info(f'Thread {self.thread_id} has been paused.')
-                self.paused_signal.emit(self.thread_id)
+                self.paused_signal.emit()
 
                 # 调用条件变量的 wait，会释放 mutex 并阻塞当前线程
                 self.pause_condition.wait(self.pause_mutex)
@@ -150,7 +150,7 @@ class DownloaderThread(QThread):
                 # 被唤醒后，若没有 stopped，则说明是 resume()
                 if not self.stopped:
                     logging.info(f'Thread {self.thread_id} has been resumed.')
-                    self.resumed_signal.emit(self.thread_id)
+                    self.resumed_signal.emit()
 
             # 再次检查是否 stop，以防在暂停期间被 stop
             if self.stopped:
@@ -629,7 +629,6 @@ class PaperDownloaderGUI(QMainWindow):
         publisher_instance = self.publisher_instance
 
         # 进行任务切分并创建 DownloaderThread
-        self.threads = []
         task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
         for i in range(self.num_threads):
             sub_list = paper_list[i * task_per_thread: (i + 1) * task_per_thread]
@@ -710,8 +709,8 @@ class PaperDownloaderGUI(QMainWindow):
         self.pause_button.setEnabled(True)
         self.resume_button.setEnabled(False)
 
-    @pyqtSlot(int)
-    def on_thread_paused(self, thread_id: int):
+    @pyqtSlot()
+    def on_thread_paused(self):
         """某个线程进入 paused 状态时的回调"""
         self.mutex.lock()
         self.paused_count += 1
@@ -719,8 +718,8 @@ class PaperDownloaderGUI(QMainWindow):
         if self.paused_count == self.num_threads:
             logging.info("All threads have been paused.")
 
-    @pyqtSlot(int)
-    def on_thread_resumed(self, thread_id: int):
+    @pyqtSlot()
+    def on_thread_resumed(self):
         """某个线程恢复时的回调"""
         self.mutex.lock()
         self.resumed_count += 1
