@@ -7,7 +7,6 @@ from core import utils, venue
 from tqdm import tqdm
 
 DEFAULT_LOG_FILE = 'paper-downloader.log'
-MAX_NUM_THREAD = 8
 
 def parse_args():
     args = argparse.ArgumentParser(description='Run CLI.')
@@ -110,7 +109,7 @@ def main():
         utils.print_warning('The paper list is empty!')
     else:
         if args.parallel:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(os.cpu_count(), MAX_NUM_THREAD)) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(os.cpu_count(), publisher.max_thread_count)) as executor:
                 futures = [executor.submit(publisher.process_one, paper_entry) for paper_entry in paper_list]
                 with tqdm(total=len(paper_list)) as progress_bar:
                     for future in concurrent.futures.as_completed(futures):

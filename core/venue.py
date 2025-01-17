@@ -23,6 +23,8 @@ class _DBLPVenueType(Enum):
 #                       Abstract Class                           #
 ##################################################################
 class _Base(ABC):
+    MAX_NUM_THREAD = 8  # 定义最大线程数为8
+
     def __init__(self,
                  save_dir: str,
                  sleep_time_per_paper: float = 2,
@@ -38,6 +40,12 @@ class _Base(ABC):
         self.dblp_url_prefix = random.choice(['https://dblp.org/db', 'https://dblp.uni-trier.de/db'])
         self.url = self._get_url()
 
+    @property
+    def max_thread_count(self) -> int:
+        """
+        返回最大线程数
+        """
+        return self.MAX_NUM_THREAD
 
     def get_paper_list(self) -> List[Tuple[str, str]]:
         if not self.url:
