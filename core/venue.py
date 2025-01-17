@@ -23,7 +23,7 @@ class _DBLPVenueType(Enum):
 #                       Abstract Class                           #
 ##################################################################
 class _Base(ABC):
-    MAX_NUM_THREAD = 8  # 定义最大线程数为8
+
 
     def __init__(self,
                  save_dir: str,
@@ -45,7 +45,7 @@ class _Base(ABC):
         """
         返回最大线程数
         """
-        return self.MAX_NUM_THREAD
+        return 8
 
     def get_paper_list(self) -> List[Tuple[str, str]]:
         if not self.url:
