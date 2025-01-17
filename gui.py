@@ -3,8 +3,8 @@ import logging
 import os
 import sys
 import threading
-
 from datetime import datetime
+from typing import List
 
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
@@ -15,9 +15,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup, QMainWindow, QMenu, QAction, QComboBox,
     QProgressBar, QDialog
 )
-
 from core import utils, venue
-
 
 ##################################################################
 #                            Constant                            #
@@ -51,14 +49,14 @@ class QtLogHandler(logging.Handler):
 
 
 ##################################################################
-#                   Thread for Fetching Paper List              #
+#                         Worker Thread                          #
 ##################################################################
 class PaperListFetchThread(QThread):
     """
     专门用于获取 paper_list 的线程，防止在主线程里直接调用导致卡顿
     """
-    paper_list_ready = pyqtSignal(list)   # 获取列表成功时，发射此信号并传递 paper_list
-    error_signal = pyqtSignal(str)        # 获取列表出错时，发射此信号
+    paper_list_ready = pyqtSignal(list)
+    error_signal = pyqtSignal(str)
 
     def __init__(self, publisher_instance):
         super().__init__()
@@ -73,16 +71,13 @@ class PaperListFetchThread(QThread):
             self.error_signal.emit(str(e))
 
 
-##################################################################
-#                         Worker Thread                          #
-##################################################################
 class DownloaderThread(QThread):
     progress_signal = pyqtSignal()
     finished_signal = pyqtSignal()
-    resumed_signal = pyqtSignal()  # 用于通知主线程：本线程已恢复
-    paused_signal = pyqtSignal()   # 用于通知主线程：本线程已进入暂停
+    resumed_signal = pyqtSignal()
+    paused_signal = pyqtSignal()
 
-    def __init__(self, publisher: type, paper_entry_list):
+    def __init__(self, publisher: type, paper_entry_list: List):
         super().__init__()
         self.publisher = publisher
         self.paper_entry_list = paper_entry_list
@@ -92,60 +87,59 @@ class DownloaderThread(QThread):
         self.thread_id = None
 
         # 互斥锁 + 条件变量，用于暂停/恢复
-        self.pause_mutex = QMutex()
-        self.pause_condition = QWaitCondition()
+        self.mutex = QMutex()
+        self.condition = QWaitCondition()
 
     def pause(self):
         """请求暂停线程"""
         if self.isFinished():
             return
-        self.pause_mutex.lock()
+        self.mutex.lock()
         self.paused = True
         logging.info(f'Thread {self.thread_id} is pausing...')
-        self.pause_mutex.unlock()
+        self.mutex.unlock()
 
     def resume(self):
         """请求恢复线程"""
         if self.isFinished():
             return
-        self.pause_mutex.lock()
+        self.mutex.lock()
         self.paused = False
         # 唤醒处于 wait() 的线程
-        self.pause_condition.wakeAll()
+        self.condition.wakeAll()
         logging.info(f'Thread {self.thread_id} is resuming...')
-        self.pause_mutex.unlock()
+        self.mutex.unlock()
 
     def stop(self):
         """请求停止线程"""
         if self.isFinished():
             return
-        self.pause_mutex.lock()
+        self.mutex.lock()
         self.stopped = True
         # 如果当前处于暂停，也要唤醒，才能让 run() 里的 wait() 及时退出
         if self.paused:
             self.paused = False
-            self.pause_condition.wakeAll()
+            self.condition.wakeAll()
         logging.info(f'Thread {self.thread_id} is stopping...')
-        self.pause_mutex.unlock()
+        self.mutex.unlock()
 
     def run(self):
         self.thread_id = threading.get_native_id()
 
         for paper_entry in self.paper_entry_list:
-            self.pause_mutex.lock()
+            self.mutex.lock()
             # 如果线程被请求停止，则立刻退出
             if self.stopped:
-                self.pause_mutex.unlock()
+                self.mutex.unlock()
                 break
 
             # 若处于暂停状态，则在这里等待
             if self.paused:
-                # 只在刚进 while 的时候发射一次 paused_signal，避免刷屏
                 logging.info(f'Thread {self.thread_id} has been paused.')
                 self.paused_signal.emit()
 
                 # 调用条件变量的 wait，会释放 mutex 并阻塞当前线程
-                self.pause_condition.wait(self.pause_mutex)
+                self.condition.wait(self.mutex)
 
                 # 被唤醒后，若没有 stopped，则说明是 resume()
                 if not self.stopped:
@@ -154,9 +148,9 @@ class DownloaderThread(QThread):
 
             # 再次检查是否 stop，以防在暂停期间被 stop
             if self.stopped:
-                self.pause_mutex.unlock()
+                self.mutex.unlock()
                 break
-            self.pause_mutex.unlock()
+            self.mutex.unlock()
 
             # 真正去执行任务
             self.publisher.process_one(paper_entry)
@@ -186,6 +180,7 @@ class PaperDownloaderGUI(QMainWindow):
 
         # 新增一个用于获取 paper_list 的线程引用
         self.list_fetch_thread = None
+        self.publisher_instance = None
 
         self.init_language()
         self.init_ui()
@@ -626,14 +621,12 @@ class PaperDownloaderGUI(QMainWindow):
         self.num_threads = min(os.cpu_count(), MAX_NUM_THREAD) if parallel else 1
         logging.info(f"The total number of threads is {self.num_threads}.")
 
-        publisher_instance = self.publisher_instance
-
         # 进行任务切分并创建 DownloaderThread
         task_per_thread = (len(paper_list) + self.num_threads - 1) // self.num_threads
         for i in range(self.num_threads):
             sub_list = paper_list[i * task_per_thread: (i + 1) * task_per_thread]
             thread = DownloaderThread(
-                publisher=publisher_instance,
+                publisher=self.publisher_instance,
                 paper_entry_list=sub_list
             )
             thread.finished_signal.connect(self.finish_downloader)
@@ -714,37 +707,35 @@ class PaperDownloaderGUI(QMainWindow):
         """某个线程进入 paused 状态时的回调"""
         self.mutex.lock()
         self.paused_count += 1
-        self.mutex.unlock()
         if self.paused_count == self.num_threads:
             logging.info("All threads have been paused.")
+        self.mutex.unlock()
 
     @pyqtSlot()
     def on_thread_resumed(self):
         """某个线程恢复时的回调"""
         self.mutex.lock()
         self.resumed_count += 1
-        self.mutex.unlock()
         if self.resumed_count == self.num_threads:
             logging.info("All threads have been resumed.")
+        self.mutex.unlock()
 
     @pyqtSlot()
     def finish_downloader(self):
         """某个线程结束时的回调"""
         self.mutex.lock()
         self.finished_threads += 1
-        self.mutex.unlock()
         if self.finished_threads == self.num_threads:
             # 所有线程都结束
             self.run_button.setEnabled(True)
             self.stop_button.setEnabled(False)
             self.pause_button.setEnabled(False)
             self.resume_button.setEnabled(False)
-
             logging.info('All downloader threads have been stopped or finished normally.')
             logging.info('Download Finished!')
             QMessageBox.information(self, "Finish", self.languages[self.current_language]['task_completed'])
-
             self.reset_progress()
+        self.mutex.unlock()
 
     @pyqtSlot(str)
     def append_log(self, log):
@@ -772,6 +763,6 @@ class PaperDownloaderGUI(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     gui = PaperDownloaderGUI()
-    gui.resize(800, 600)
+    gui.resize(600, 600)
     gui.show()
     sys.exit(app.exec_())
