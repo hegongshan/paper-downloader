@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import random
@@ -38,9 +39,9 @@ class Test(unittest.TestCase):
         else:
             # 随机选择一个年份
             correct_len = 1
-            test_range = random.sample(correct_range, 1)
+            test_range = [random.choice(correct_range)]
             if error_range:
-                test_range += random.sample(error_range, 1)
+                test_range.append(random.choice(error_range))
 
         for idx, year_or_volume in enumerate(test_range):
             save_dir = os.path.join(save_dir_, str(year_or_volume))
@@ -162,7 +163,18 @@ class Test(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run Test.')
+    parser.add_argument('-f', '--full-test',
+                        action='store_true',
+                        help='Enable full testing.')
+    parser.add_argument('-s', '--sleep-time-per-paper',
+                        type=float,
+                        default=2,
+                        help='The time interval between downloads, measured in seconds. (default value: 2)')
+    args = parser.parse_args()
+    full_test = args.full_test
+    sleep_time_per_paper = args.sleep_time_per_paper
+
     if os.path.exists(save_dir_prefix):
         shutil.rmtree(save_dir_prefix)
-
     unittest.main()
