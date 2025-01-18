@@ -45,7 +45,7 @@ def download_file(url: str, filename: str, proxies: Dict[str, str] = None) -> No
 
         with open(filename, 'wb') as file:
             file.write(r.content)
-    except requests.HTTPError as e:
+    except Exception as e:
         logging.error(f'download file: url = {url}, filename = {filename}, error: {e}')
 
 
