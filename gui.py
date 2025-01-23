@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import logging
 import os
@@ -24,7 +25,6 @@ LANGUAGE_FILE = utils.get_abs_path('config', os.path.join('i18n', 'lang.json'))
 CONFIG_FILE = utils.get_abs_path('config', 'config.json')
 QSS_FILE = utils.get_abs_path('config', 'gui.qss')
 DEFAULT_SLEEP_TIME = 2
-MAX_NUM_THREAD = 8
 
 PROJECT_START_YEAR = 2024
 PROJECT_VERSION = 'v1.0'
@@ -618,7 +618,7 @@ class PaperDownloaderGUI(QMainWindow):
 
         # 判断并行/串行
         parallel = (self.btn_group.checkedButton().text() == self.languages[self.current_language]['enable'])
-        self.num_threads = min(os.cpu_count(), MAX_NUM_THREAD) if parallel else 1
+        self.num_threads = min(os.cpu_count(), self.publisher_instance.max_thread_count) if parallel else 1
         logging.info(f"The total number of threads is {self.num_threads}.")
 
         # 进行任务切分并创建 DownloaderThread

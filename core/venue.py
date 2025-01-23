@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import re
 import threading
 import time
@@ -22,6 +23,8 @@ class _DBLPVenueType(Enum):
 #                       Abstract Class                           #
 ##################################################################
 class _Base(ABC):
+
+
     def __init__(self,
                  save_dir: str,
                  sleep_time_per_paper: float = 2,
@@ -34,8 +37,15 @@ class _Base(ABC):
         self.sleep_time_per_paper = sleep_time_per_paper
         self.keyword = keyword
         self.proxies = proxies
+        self.dblp_url_prefix = random.choice(['https://dblp.org/db', 'https://dblp.uni-trier.de/db'])
         self.url = self._get_url()
-        self.dblp_url_prefix = 'https://dblp.org/db/'
+
+    @property
+    def max_thread_count(self) -> int:
+        """
+        返回最大线程数
+        """
+        return 8
 
     def get_paper_list(self) -> List[Tuple[str, str]]:
         if not self.url:
@@ -127,16 +137,15 @@ class _Base(ABC):
 
     def _get_dblp_venue_type(self) -> str | None:
         start = len(self.dblp_url_prefix)
+        remaining = self.url[start:].lstrip('/')  # 去除开头的斜杠
 
-        # The url has been checked in get_paper_list().
-        remaining = self.url[start:]
         if not remaining:
             return None
 
         slash_idx = remaining.find('/')
         if slash_idx == -1:
             return None
-        return self.url[start: start + slash_idx]
+        return remaining[:slash_idx]
 
     def _get_paper_list_by_diy(self, html) -> List[Tuple[str, str]]:
         result_tuple = self._get_paper_title_and_url_list_by_diy(html)
@@ -255,7 +264,7 @@ class USENIX(_MultiConference):
         else:
             suffix = ''
 
-        return f'https://dblp.org/db/conf/{self.venue_name}/{self.venue_name}{self.year}{suffix}.html'
+        return f'{self.dblp_url_prefix}/conf/{self.venue_name}/{self.venue_name}{self.year}{suffix}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -270,7 +279,7 @@ class USENIX(_MultiConference):
 class NDSS(_Conference):
 
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/ndss/ndss{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/ndss/ndss{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -284,7 +293,7 @@ class NDSS(_Conference):
 
 class AAAI(_Conference):
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/aaai/aaai{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/aaai/aaai{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -298,7 +307,7 @@ class AAAI(_Conference):
 
 class IJCAI(_Conference):
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/ijcai/ijcai{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/ijcai/ijcai{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -377,7 +386,7 @@ class ECCV(_Conference):
 class ICLR(_Conference):
 
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/iclr/iclr{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/iclr/iclr{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -397,7 +406,7 @@ class ICLR(_Conference):
 class ICML(_Conference):
 
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/icml/icml{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/icml/icml{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -426,7 +435,7 @@ class NeurIPS(_Conference):
         else:
             venue_name = 'neurips'
 
-        return f'https://dblp.org/db/conf/nips/{venue_name}{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/nips/{venue_name}{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -454,7 +463,7 @@ class ACL(_MultiConference):
         else:
             suffix = ''
 
-        return f'https://dblp.org/db/conf/{venue_name}/{venue_name}{self.year}{suffix}.html'
+        return f'{self.dblp_url_prefix}/conf/{venue_name}/{venue_name}{self.year}{suffix}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -469,7 +478,7 @@ class ACL(_MultiConference):
 class RSS(_Conference):
 
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/conf/rss/rss{self.year}.html'
+        return f'{self.dblp_url_prefix}/conf/rss/rss{self.year}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
@@ -488,7 +497,7 @@ class RSS(_Conference):
 class PVLDB(_Journal):
 
     def _get_url(self) -> str | None:
-        return f'https://dblp.org/db/journals/pvldb/pvldb{self.volume}.html'
+        return f'{self.dblp_url_prefix}/journals/pvldb/pvldb{self.volume}.html'
 
     def _get_paper_title_and_url_list_by_diy(self, html) -> Tuple[List[_Tag], List[_Tag]] | None:
         pass
