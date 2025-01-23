@@ -10,51 +10,51 @@ DEFAULT_LOG_FILE = 'paper-downloader.log'
 
 
 def parse_args():
-    args = argparse.ArgumentParser(description='Run CLI.')
+    parser = argparse.ArgumentParser(description='Run CLI.')
 
     # General options
-    args.add_argument('--venue',
+    parser.add_argument('--venue',
                       type=str,
                       required=True,
                       help=f'Available value = {venue.get_available_venues()}.')
-    args.add_argument('--save-dir',
+    parser.add_argument('--save-dir',
                       type=str,
                       default='paper',
                       help='Set a directory to store these papers. (default value: "paper")')
-    args.add_argument('--log-file',
+    parser.add_argument('--log-file',
                       type=str,
                       default=DEFAULT_LOG_FILE,
                       help=f'The filename of the log. (default value: "{DEFAULT_LOG_FILE}")')
-    args.add_argument('--sleep-time-per-paper',
+    parser.add_argument('--sleep-time-per-paper',
                       type=float,
                       default=2,
                       help='The time interval between downloads, measured in seconds. (default value: 2)')
-    args.add_argument('--keyword',
+    parser.add_argument('--keyword',
                       type=str,
                       help='The keywords or regex patterns that must be present or matched in the title of the paper.')
 
     # Conference specific options
-    args.add_argument('--year',
+    parser.add_argument('--year',
                       type=int,
                       help='The year of the conference.')
 
     # Journal specific options
-    args.add_argument('--volume',
+    parser.add_argument('--volume',
                       type=int,
                       help='The volume number of the journal.')
 
     # Advanced options
-    args.add_argument('--http-proxy',
+    parser.add_argument('--http-proxy',
                       type=str,
                       help='HTTP Proxy server.')
-    args.add_argument('--https-proxy',
+    parser.add_argument('--https-proxy',
                       type=str,
                       help='HTTPS Proxy server.')
-    args.add_argument('--parallel',
+    parser.add_argument('--parallel',
                       action='store_true',
                       help='Use parallel downloads.')
 
-    return args.parse_args()
+    return parser.parse_args()
 
 
 def main():
