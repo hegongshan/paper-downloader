@@ -82,7 +82,7 @@ $ ./script/build.sh
 * Windows
 
 ```shell
-$ ./script/build.bat
+$ .\script\build.bat
 ```
 
 #### Supported Venue
