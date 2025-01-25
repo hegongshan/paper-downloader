@@ -116,7 +116,8 @@ if not exist "%save_dir%" (
     mkdir %save_dir%
 )
 
-set "pyinstaller_options=-F -y"
+set "app_name=apbdoav-%m%"
+set "pyinstaller_options=-F -y --name %app_name%"
 if "%m%" == "gui" (
     set "pyinstaller_options=%pyinstaller_options% --add-data config;."
 )
@@ -126,8 +127,8 @@ pip install -r requirements-%m%.txt ^
     && pip install pyinstaller ^
     && pyinstaller %pyinstaller_options% %m%.py ^
     && rmdir /s /q build ^
-    && del /q %m%.spec ^
-    && copy dist\%m%.exe %save_dir%\ ^
+    && del /q %app_name%.spec ^
+    && copy dist\%app_name%.exe %save_dir%\ ^
     && rmdir /s /q dist
 
 exit /b

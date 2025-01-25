@@ -12,7 +12,8 @@ help_msg() {
 build() {
     local mode="$1"
     local save_dir="$2"
-    local pyinstaller_options="-F -y"
+    local app_name="apbdoav-${mode}"
+    local pyinstaller_options="-F -y --name ${app_name}"
     if [ "${mode}" == "gui" ]; then
         pyinstaller_options+=" --add-data config:."
     fi
@@ -21,8 +22,8 @@ build() {
     pip3 install -r requirements-${mode}.txt && \
         pip3 install pyinstaller && \
         pyinstaller ${pyinstaller_options} ${mode}.py && \
-        rm -rf build ${mode}.spec && \
-        cp dist/${mode} ${save_dir}/ && \
+        rm -rf build ${app_name}.spec && \
+        cp dist/${app_name} ${save_dir}/ && \
         rm -rf dist
 }
 
