@@ -23,16 +23,17 @@ paper-downloader/
 ├── README.md
 ├── cli.py
 ├── gui.py
-└── requirements.txt
-```
-
-#### Install Dependencies
-
-```shell
-$ pip3 install -r requirements.txt
+├── requirements-cli.txt
+└── requirements-gui.txt
 ```
 
 #### CLI Mode
+
+##### Install Dependencies
+
+```shell
+$ pip3 install -r requirements-cli.txt
+```
 
 ##### Usage
 
@@ -71,18 +72,36 @@ $ python3 cli.py --venue fast --year 2023
 
 #### GUI mode
 
-##### How to Package
+##### Install Dependencies
+
+```shell
+$ pip3 install -r requirements-gui.txt
+```
+
+##### Run
+
+```shell
+$ python3 gui.py
+```
+
+#### Package
 
 * Linux/macOS
 
 ```shell
-$ ./script/build.sh
+$ ./script/build.sh -h
+Usage:
+
+    -h, --help  Show this help message
+    -c, --cli   Build CLI
+    -g, --gui   Build GUI
+    -d, --dir   Save directory (default directory: .)
 ```
 
 * Windows
 
 ```shell
-$ .\script\build.bat
+$ .\script\build.bat -h
 ```
 
 #### Supported Venue
