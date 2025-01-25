@@ -51,7 +51,7 @@ while [[ $# -ne 0 ]]; do
           -o "${dir}" = "--cli" \
           -o "${dir}" = "-g" \
           -o "${dir}" = "--gui" ]; then
-            echo "-d/--dir option requires a parameter."
+            echo "Error: -d/--dir option requires a parameter."
             exit
         elif [ ! -e "${dir}" ]; then
             mkdir -p ${dir}
@@ -65,6 +65,10 @@ while [[ $# -ne 0 ]]; do
     esac
 done
 
-for mode in ${modes[@]}; do
-    build ${mode} ${dir}
-done
+if [ -z "${modes}" ]; then
+  echo "Error: At least one of the -c/--cli or -g/--gui options need to be set."
+else
+    for mode in ${modes[@]}; do
+        build ${mode} ${dir}
+    done
+fi
