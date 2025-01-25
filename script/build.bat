@@ -97,10 +97,10 @@ exit /b
 :help_msg
 echo Usage:
 echo.
-echo     -h, --help  Show this help message
-echo     -c, --cli   Build CLI
-echo     -g, --gui   Build GUI
-echo     -d, --dir   Save directory (default directory: .)
+echo     -h, --help     Show this help message
+echo     -c, --cli      Build CLI
+echo     -g, --gui      Build GUI
+echo     -d, --dir DIR  Save directory (default directory: .)
 exit /b
 
 :build
